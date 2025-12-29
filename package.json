@@ -1,19 +1,14 @@
 {
-  "name": "lumitime-frontend",
+  "name": "subtuber-monorepo",
+  "private": true,
   "version": "1.0.0",
-  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "vue": "^3.3.4",
-    "vue-router": "^4.2.4",
-    "axios": "^1.5.0"
-  },
-  "devDependencies": {
-    "@vitejs/plugin-vue": "^4.3.4",
-    "vite": "^4.4.9"
+    "dev:app-main": "npm --workspace=app-main run dev",
+    "dev:app-copy": "npm --workspace=app-copy run dev",
+    "build:app-main": "npm --workspace=app-main run build",
+    "build:app-copy": "npm --workspace=app-copy run build"
   }
 }

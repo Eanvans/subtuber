@@ -1,19 +1,3 @@
-import { defineConfig } from 'vite'
-import vue from '@vitejs/plugin-vue'
-
-export default defineConfig({
-  plugins: [vue()],
-  server: {
-    port: 3000,
-    proxy: {
-      '/api': {
-        target: 'http://localhost:8080',
-        changeOrigin: true
-      },
-      '/img': {
-        target: 'http://localhost:8080',
-        changeOrigin: true
-      }
-    }
-  }
-})
+// Root vite config is intentionally minimal for the monorepo root.
+// Per-package Vite configs live under `packages/*/vite.config.js`.
+export default {}

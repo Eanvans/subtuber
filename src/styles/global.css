@@ -10,23 +10,10 @@
   --shadow-lg: 0 8px 24px rgba(16, 24, 40, 0.06);
 }
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+/* Archived styles — active styles live per-package in packages/*/src/styles */
+html,body,#app{height:100%}
+body{font-family: system-ui, 'Segoe UI', Roboto, Arial, sans-serif}
 
-html, body {
-  height: 100%;
-}
-
-body {
-  background: var(--bg);
-  color: var(--muted);
-  font-family: Inter, system-ui, -apple-system, "Helvetica Neue", Arial, 
-    "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", sans-serif;
-  line-height: 1.5;
-}
 
 #app {
   min-height: 100vh;
