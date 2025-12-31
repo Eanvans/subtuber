@@ -37,8 +37,6 @@
         </div>
       </div>
     </main>
-
-    <footer class="footer-fixed">示例 - 复制版</footer>
   </div>
   <div v-if="showLogin" class="login-overlay">
     <div class="login-card">
