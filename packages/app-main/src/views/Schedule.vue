@@ -7,7 +7,7 @@
           <li><router-link to="/">主播订阅</router-link></li>
           <li><router-link to="/schedule" class="active">直播日程</router-link></li>
         </ul>
-        <button class="btn btn-primary">登录</button>
+        <button class="btn btn-primary" @click="showLogin = true">登录</button>
       </div>
     </nav>
 
@@ -47,17 +47,29 @@
         </div>
       </div>
     </main>
+    <div v-if="showLogin" class="login-overlay">
+      <div class="login-card">
+        <button class="btn-close" @click="showLogin = false">×</button>
+        <Login @verified="onVerified" @sent="onSent" @error="onLoginError" />
+      </div>
+    </div>
   </div>
 </template>
 
 <script>
 import { ref, onMounted } from 'vue'
+import Login from '../../../shared-auth/Login.vue'
 
 export default {
   name: 'Schedule',
+  components: { Login },
   setup() {
     const loading = ref(true)
     const events = ref([])
+    const showLogin = ref(false)
+    const onVerified = () => { showLogin.value = false }
+    const onSent = () => {}
+    const onLoginError = e => { console.error(e) }
 
     const scheduleData = [
       {
@@ -93,13 +105,25 @@ export default {
       loading,
       events,
       formatDate,
-      formatTime
+      formatTime,
+      showLogin,
+      onVerified,
+      onSent,
+      onLoginError
     }
   }
 }
+
+<style scoped>
+.login-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:1000 }
+.login-card { width: 420px; max-width: 95%; background: var(--card, #111); padding: 1rem; border-radius: 8px; position: relative }
+.btn-close { position: absolute; right: 8px; top: 8px; border: none; background: transparent; font-size: 1.25rem }
 </script>
 
 <style scoped>
+.login-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:1000 }
+.login-card { width: 420px; max-width: 95%; background: var(--card, #111); padding: 1rem; border-radius: 8px; position: relative }
+.btn-close { position: absolute; right: 8px; top: 8px; border: none; background: transparent; font-size: 1.25rem }
 .schedule-page { min-height: 100vh; background: rgba(0, 0, 0, 0.95); color: #f1f1f1 }
 .schedule-container { display: flex; align-items: center; justify-content: center; padding: 2rem; min-height: calc(100vh - 72px) }
 .schedule-content { max-width: 600px; width: 100% }

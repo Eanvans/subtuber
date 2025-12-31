@@ -46,3 +46,23 @@ export default {
   login,
   logout
 }
+
+// 下面是基于邮箱验证码的轻量接口，供 `Login.vue` 组件或其他代码复用。
+export async function sendCode({ email, url = '/api/auth/send-code' }) {
+  if (!email) throw new Error('email required')
+  const res = await axios.post(url, { email })
+  return res && res.data ? res.data : res
+}
+
+export async function verifyCode({ email, code, url = '/api/auth/verify' }) {
+  if (!email) throw new Error('email required')
+  if (!code) throw new Error('code required')
+  const res = await axios.post(url, { email, code })
+  if (res && res.data && res.data.token) {
+    setToken(res.data.token)
+  }
+  return res && res.data ? res.data : res
+}
+
+// 直接导出组件以便其他项目通过 `import { Login } from 'shared-auth'` 使用
+export { default as Login } from './Login.vue'

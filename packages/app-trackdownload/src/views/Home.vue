@@ -3,7 +3,7 @@
     <nav class="navbar">
       <div class="navbar-container">
         <router-link to="/" class="brand">订阅我推的主播</router-link>
-        <button class="btn btn-primary">登录</button>
+        <button class="btn btn-primary" @click="showLogin = true">登录</button>
       </div>
     </nav>
 
@@ -40,18 +40,30 @@
 
     <footer class="footer-fixed">示例 - 复制版</footer>
   </div>
+  <div v-if="showLogin" class="login-overlay">
+    <div class="login-card">
+      <button class="btn-close" @click="showLogin = false">×</button>
+      <Login @verified="onVerified" @sent="onSent" @error="onLoginError" />
+    </div>
+  </div>
 </template>
 
 <script>
 import { ref } from 'vue'
 import { api } from '../api'
+import Login from '../../../shared-auth/Login.vue'
 
 export default {
+  components: { Login },
   setup() {
     const searchQuery = ref('')
     const loading = ref(false)
     const results = ref([])
     const error = ref('')
+    const showLogin = ref(false)
+    const onVerified = () => { showLogin.value = false }
+    const onSent = () => {}
+    const onLoginError = e => { console.error(e) }
 
     const handleSearch = async () => {
       if (!searchQuery.value.trim()) return
@@ -68,7 +80,7 @@ export default {
 
     const subscribe = () => alert('订阅功能开发中')
 
-    return { searchQuery, loading, results, error, handleSearch, subscribe }
+    return { searchQuery, loading, results, error, handleSearch, subscribe, showLogin, onVerified, onSent, onLoginError }
   }
 }
 </script>
@@ -76,4 +88,7 @@ export default {
 <style scoped>
 .home-page { min-height:100vh }
 .result-item { display:flex; justify-content:space-between; padding:0.75rem; border-radius:8px; margin-bottom:0.5rem; text-decoration:none; color:inherit }
+.login-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:1000 }
+.login-card { width: 420px; max-width: 95%; background: var(--card, #fff); padding: 1rem; border-radius: 8px; position: relative }
+.btn-close { position: absolute; right: 8px; top: 8px; border: none; background: transparent; font-size: 1.25rem }
 </style>

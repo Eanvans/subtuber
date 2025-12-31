@@ -2,9 +2,9 @@
   <div class="home-page">
     <nav class="navbar">
       <div class="navbar-container">
-        <router-link to="/" class="brand">订阅我推的主播</router-link>
-        <button class="btn btn-primary">登录</button>
-      </div>
+          <router-link to="/" class="brand">订阅我推的主播</router-link>
+          <button class="btn btn-primary" @click="showLogin = true">登录</button>
+        </div>
     </nav>
 
     <main class="main-content">
@@ -78,19 +78,31 @@
 
     <footer class="footer-fixed">Privacy: 本站仅用于演示，不收集个人隐私信息。</footer>
   </div>
+  <div v-if="showLogin" class="login-overlay">
+    <div class="login-card">
+      <button class="btn-close" @click="showLogin = false">×</button>
+      <Login @verified="onVerified" @sent="onSent" @error="onLoginError" />
+    </div>
+  </div>
 </template>
 
 <script>
 import { ref } from 'vue'
 import { api } from '../api'
+import Login from '../../../shared-auth/Login.vue'
 
 export default {
   name: 'Home',
+  components: { Login },
   setup() {
     const searchQuery = ref('')
     const loading = ref(false)
     const results = ref([])
     const error = ref('')
+    const showLogin = ref(false)
+    const onVerified = res => { showLogin.value = false }
+    const onSent = payload => { /* optional: show toast */ }
+    const onLoginError = err => { console.error('login error', err) }
 
     const handleSearch = async () => {
       const query = searchQuery.value.trim()
@@ -145,12 +157,19 @@ export default {
       handleSearch,
       formatNumber,
       subscribe
+      , showLogin,
+      onVerified,
+      onSent,
+      onLoginError
     }
   }
 }
 </script>
 
 <style scoped>
+.login-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:1000 }
+.login-card { width: 420px; max-width: 95%; background: var(--card, #fff); padding: 1rem; border-radius: 8px; position: relative }
+.btn-close { position: absolute; right: 8px; top: 8px; border: none; background: transparent; font-size: 1.25rem }
 .home-page { min-height: 100vh; display: flex; flex-direction: column }
 .main-content { flex: 1; padding: 2.25rem 0; display: flex; align-items: flex-start }
 .results-box { margin-top: 1.125rem; height: 60vh; overflow-y: auto; padding: 0.75rem; background: #ffffff; border-radius: 8px; border: 1px solid var(--border) }
