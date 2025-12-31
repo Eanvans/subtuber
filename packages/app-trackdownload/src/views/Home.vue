@@ -2,7 +2,7 @@
   <div class="home-page">
     <nav class="navbar">
       <div class="navbar-container">
-        <router-link to="/" class="brand">订阅我推的主播</router-link>
+        <router-link to="/" class="brand">持续追踪你的下载</router-link>
         <button class="btn btn-primary" @click="showLogin = true">登录</button>
       </div>
     </nav>
@@ -12,7 +12,7 @@
         <div class="card" style="max-width: 960px; margin: 0 auto">
           <div class="text-center mb-3">
             <h2 style="font-size: 1.5rem; margin-bottom: 1rem; color: var(--muted)">
-              查找你喜欢的主播 (复制版)
+              跟踪你的下载
             </h2>
             <form @submit.prevent="handleSearch" class="flex justify-center items-center gap-3">
               <input v-model="searchQuery" class="input input-rounded" type="search" placeholder="输入主播名称" style="width: 70%" />
@@ -23,7 +23,7 @@
           <div class="results-box">
             <p v-if="!loading && results.length === 0 && !error" class="text-center text-muted">搜索结果将显示在这里。</p>
             <div v-if="error" class="text-center" style="color: #ef4444; padding: 1rem">{{ error }}</div>
-            <div v-if="loading" class="text-center text-muted">正在查询 Twitch...</div>
+            <div v-if="loading" class="text-Ícenter text-muted">正在查询 Twitch...</div>
             <a v-for="item in results" :key="item.id" :href="item.url" target="_blank" rel="noopener noreferrer" class="result-item">
               <div style="flex:1">
                 <strong>{{ item.name }}</strong>

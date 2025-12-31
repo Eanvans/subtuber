@@ -2,7 +2,6 @@ import { createApp } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
 import App from './App.vue'
 import Home from './views/Home.vue'
-import Schedule from './views/Schedule.vue'
 import './styles/global.css'
 
 const router = createRouter({
