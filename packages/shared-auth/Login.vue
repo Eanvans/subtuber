@@ -18,7 +18,7 @@
           />
           <div class="error" v-if="errors.email">{{ errors.email }}</div>
           <div id="emailHelp" class="small-muted">
-            系统会向该邮箱发送 6 位验证码，验证码有效期 10 分钟。
+            系统会向该邮箱发送 6 位验证码，有效期 10 分钟
           </div>
         </div>
 
@@ -43,15 +43,6 @@
         </div>
 
         <!-- 显示邮箱以提示用户（只读） -->
-        <div class="form-group">
-          <label class="form-label">邮箱</label>
-          <input
-            type="text"
-            :value="email || emailSend"
-            disabled
-            class="form-control muted"
-          />
-        </div>
 
         <div class="form-group">
           <label for="code" class="form-label">验证码</label>
@@ -122,6 +113,8 @@ function syncEmailFields() {
 
 async function handleSend() {
   errors.email = "";
+  formErrors.general = '';
+  infoMessage.value = '';
   if (!emailSend.value || !emailSend.value.includes("@")) {
     errors.email = "请输入有效邮箱地址";
     return;
@@ -137,7 +130,8 @@ async function handleSend() {
     emit("sent", { email: email.value, res });
   } catch (e) {
     emit("error", e);
-    formErrors.general = e.message || "发送失败";
+    // 显示通用提示，不暴露完整错误信息
+    infoMessage.value = '发送失败，稍后再试';
   } finally {
     sending.value = false;
   }
