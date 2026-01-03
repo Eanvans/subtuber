@@ -7,8 +7,9 @@
   ],
   "scripts": {
     "dev:app-main": "npm --workspace=app-main run dev",
-    "dev:app-copy": "npm --workspace=app-copy run dev",
+    "dev:app-trackdownload": "npm --workspace=app-trackdownload run dev",
+    "dev:all": "npm run dev:app-main & npm run dev:app-trackdownload",
     "build:app-main": "npm --workspace=app-main run build",
-    "build:app-copy": "npm --workspace=app-copy run build"
+    "build:app-trackdownload": "npm --workspace=app-trackdownload run build"
   }
 }

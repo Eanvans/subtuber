@@ -1,3 +1,5 @@
 /node_modules
 .DS_Store
 /packages/app-trackdownload/node_modules
+/packages/app-main/node_modules
+/packages/app-main/node_modules
