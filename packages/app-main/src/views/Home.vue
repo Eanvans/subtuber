@@ -3,7 +3,10 @@
     <nav class="navbar">
       <div class="navbar-container">
           <router-link to="/" class="brand">订阅我推的主播</router-link>
-          <button class="btn btn-primary" @click="showLogin = true">登录</button>
+          <div class="nav-actions">
+            <router-link v-if="currentUser" to="/settings" class="btn btn-ghost">{{ currentUser.username || currentUser.name || currentUser.userName || currentUser }}</router-link>
+            <button v-else class="btn btn-primary" @click="showLogin = true">登录</button>
+          </div>
         </div>
     </nav>
 
@@ -100,7 +103,18 @@ export default {
     const results = ref([])
     const error = ref('')
     const showLogin = ref(false)
-    const onVerified = res => { showLogin.value = false }
+    const currentUser = ref(null)
+    // load from localStorage
+    try { const u = localStorage.getItem('user'); currentUser.value = u ? JSON.parse(u) : null } catch(e){ currentUser.value = null }
+
+    const onVerified = res => {
+      showLogin.value = false
+      const user = res && res.user ? res.user : null
+      if (user) {
+        currentUser.value = user
+        try { localStorage.setItem('user', JSON.stringify(user)) } catch (e) {}
+      }
+    }
     const onSent = payload => { /* optional: show toast */ }
     const onLoginError = err => { console.error('login error', err) }
 
@@ -160,7 +174,8 @@ export default {
       , showLogin,
       onVerified,
       onSent,
-      onLoginError
+      onLoginError,
+      currentUser
     }
   }
 }
