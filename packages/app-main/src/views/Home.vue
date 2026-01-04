@@ -4,7 +4,7 @@
       <div class="navbar-container">
           <router-link to="/" class="brand">订阅我推的主播</router-link>
           <div class="nav-actions">
-            <router-link v-if="currentUser" to="/settings" class="btn btn-ghost">{{ currentUser.username || currentUser.name || currentUser.userName || currentUser }}</router-link>
+            <router-link v-if="currentUser" to="/settings" class="btn btn-ghost"><i class="bi bi-person-circle" aria-hidden="true"></i> {{ currentUser.displayName || currentUser.email  }}</router-link>
             <button v-else class="btn btn-primary" @click="showLogin = true">登录</button>
           </div>
         </div>

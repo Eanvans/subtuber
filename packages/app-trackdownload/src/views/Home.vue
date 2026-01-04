@@ -8,10 +8,9 @@
             v-if="currentUser"
             to="/settings"
             class="btn btn-ghost"
-            >{{
-              currentUser.displayName ||
-              currentUser.email
-            }}</router-link
+              ><i class="bi bi-person-circle" aria-hidden="true"></i> {{
+                currentUser.displayName || currentUser.email 
+              }}</router-link
           >
           <button v-else class="btn btn-primary" @click="showLogin = true">
             登录
