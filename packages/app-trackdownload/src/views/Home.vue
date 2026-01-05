@@ -32,6 +32,9 @@
             >
               跟踪你的下载
             </h2>
+            <p class="description">
+              粘贴下载链接或输入跟踪标识，查看历史记录（只显示最近 5 条）
+            </p>
             <form
               @submit.prevent="handleSearch"
               class="flex justify-center items-center gap-3"
@@ -40,7 +43,7 @@
                 v-model="searchQuery"
                 class="input input-rounded"
                 type="search"
-                placeholder="输入主播名称"
+                placeholder="粘贴下载链接或输入跟踪代码，例如：abc123"
                 style="width: 70%"
               />
               <button
@@ -120,7 +123,6 @@ export default {
     const currentUser = ref(null);
     try {
       const u = localStorage.getItem("UserInfo");
-      console.log(u);
       currentUser.value = u ? JSON.parse(u) : null;
     } catch (e) {
       currentUser.value = null;
