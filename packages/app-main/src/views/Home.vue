@@ -81,19 +81,22 @@
             <!-- Mock recordings placeholders for future VODs -->
             <div class="recordings">
               <div class="recording-list">
-                <div class="recording-card" v-for="v in mockVideos" :key="v.id">
+                <div class="recording-card" v-for="v in vods" :key="v.id">
                   <div class="rec-info">
-                    <div class="rec-title">{{ v.title }}</div>
-                    <div class="rec-meta">{{ v.platform }} · {{ v.duration }}</div>
+                    <div class="rec-header">
+                      <span class="rec-label">直播标题</span>
+                      <div class="rec-title" :title="v.title">{{ v.title }}</div>
+                    </div>
+                    <div class="rec-meta">{{ v.platform }} · {{ v.duration  }}</div>
 
                     <!-- Inline line chart placeholder (comments over time) -->
                     <div class="rec-chart">
-                      <svg :viewBox="`0 0 ${chartWidth} ${chartHeight}`" class="chart-svg" role="img" aria-label="comments over time">
-                        <g class="grid">
-                          <path :d="gridPath(chartWidth, chartHeight)" stroke="#eee" fill="none" />
-                        </g>
-                        <path :d="computePath(v.points, chartWidth, chartHeight)" class="chart-path" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                      </svg>
+                      <div style="height:80px; position:relative">
+                        <canvas :id="`chart-${v.id}`"></canvas>
+                      </div>
+                      <div style="margin-top:6px">
+                        <button class="btn btn-ghost" @click="loadAnalysis(v)" :disabled="analysisLoading[v.id]">{{ analysisLoading[v.id] ? '加载中...' : '加载分析' }}</button>
+                      </div>
                     </div>
 
                   </div>
@@ -113,8 +116,10 @@
 </template>
 
 <script>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, nextTick } from "vue";
 import { api } from "../api";
+import { getStreamers, getTwitchStatus, getAnalysis } from "../api/streamers";
+import Chart from "chart.js/auto";
 import Login from "../../../shared-auth/Login.vue";
 
 export default {
@@ -162,30 +167,98 @@ export default {
     // Streamer avatar (fallback)
     const avatarUrl = ref('https://static-cdn.jtvnw.net/jtv_user_pictures/7ef8599e-5252-43b4-a4fa-baff1a73e78c-profile_image-70x70.png');
 
-    // Mock recordings placeholder data (each has sample points for the future comments-over-time chart)
-    const mockVideos = ref([
-      {
-        id: 1,
-        title: "【占位】Kanekolumi 直播回放 #1",
-        platform: "Twitch",
-        duration: "1:20:34",
-        points: [2, 5, 3, 8, 6, 9, 7],
-      },
-      {
-        id: 2,
-        title: "【占位】Kanekolumi 直播回放 #2",
-        platform: "YouTube",
-        duration: "0:45:10",
-        points: [1, 2, 4, 3, 5, 4],
-      },
-      {
-        id: 3,
-        title: "【占位】Kanekolumi 直播回放 #3",
-        platform: "Twitch",
-        duration: "2:03:21",
-        points: [3, 6, 5, 7, 6, 8, 10],
-      },
-    ]);
+    // VOD list (will be loaded from the server /api/streamers)
+    const vods = ref([]);
+
+    // default/sample points used for inline chart when server does not provide time-series
+    const defaultPoints = [1, 3, 2, 5, 4, 6];
+
+    const fetchStreamers = async () => {
+      try {
+        const list = await getStreamers();
+        vods.value = list.map((s) => ({
+          id: s.id,
+          title: s.title || s.name || '未命名',
+          platform: s.platform || '',
+          duration: s.duration_seconds || s.duration || '',
+          created_at: s.created_at || null,
+          points: s.points && s.points.length ? s.points : defaultPoints,
+          raw: s,
+        }));
+      } catch (e) {
+        console.error('fetchStreamers error', e);
+        vods.value = [];
+      }
+    };
+
+    // per-vod analysis cache and chart instances
+    const analysisMap = ref({});
+    const charts = {};
+    const analysisLoading = ref({});
+
+    const loadAnalysis = async (vod) => {
+      vod.id = 2661008731; // temp override for testing
+      if (!vod || !vod.id) return;
+      const vid = vod.id;
+      if (analysisMap.value[vid]) return; // already loaded
+      try {
+        analysisLoading.value = { ...analysisLoading.value, [vid]: true };
+        const data = await getAnalysis(vid);
+        // expected structure AnalysisResult with TimeSeriesData
+        const series = (data && data.time_series_data) ? data.time_series_data : [];
+        analysisMap.value = { ...analysisMap.value, [vid]: series };
+        await nextTick();
+        const canvas = document.querySelector(`#chart-${vid}`);
+        if (canvas) {
+          const labels = series.map((p) => p.formatted_time || String(p.offset_seconds));
+          const values = series.map((p) => p.score ?? 0);
+          if (charts[vid]) {
+            charts[vid].data.labels = labels;
+            charts[vid].data.datasets[0].data = values;
+            charts[vid].update();
+          } else {
+            const ctx = canvas.getContext('2d');
+            charts[vid] = new Chart(ctx, {
+              type: 'line',
+              data: {
+                labels,
+                datasets: [
+                  {
+                    label: 'Score',
+                    data: values,
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59,130,246,0.08)',
+                    tension: 0.3,
+                    pointRadius: 2,
+                    fill: true,
+                  },
+                ],
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                  x: {
+                    ticks: { maxRotation: 0, autoSkip: true },
+                  },
+                  y: {
+                    beginAtZero: true,
+                  },
+                },
+                plugins: {
+                  legend: { display: false },
+                  tooltip: { mode: 'index', intersect: false },
+                },
+              },
+            });
+          }
+        }
+      } catch (e) {
+        console.error('loadAnalysis error', e);
+      } finally {
+        analysisLoading.value = { ...analysisLoading.value, [vid]: false };
+      }
+    };
 
     // Chart dimensions used by inline SVGs
     const chartWidth = 220;
@@ -223,12 +296,9 @@ export default {
     const checkLive = async () => {
       try {
         loadingStatus.value = true;
-        const res = await fetch("/api/twitch/status");
-        if (!res.ok) throw new Error("fetch failed");
-        const data = await res.json();
+        const data = await getTwitchStatus();
         isLive.value = !!data.live;
-        platforms.value =
-          data.platforms || (data.platform ? [data.platform] : []);
+        platforms.value = data.platforms || (data.platform ? [data.platform] : []);
         streamTitle.value = data.title || "";
         viewerCount.value = data.viewer_count || data.viewers || null;
         thumbnail.value = data.thumbnail || "";
@@ -244,6 +314,7 @@ export default {
     onMounted(() => {
       checkLive();
       setInterval(checkLive, 30000);
+      fetchStreamers();
     });
 
     const handleSearch = async () => {
@@ -282,7 +353,11 @@ export default {
       liveUrl,
       statusChecked,
       avatarUrl,
-      mockVideos,
+      vods,
+      fetchStreamers,
+      analysisMap,
+      loadAnalysis,
+      analysisLoading,
       chartWidth,
       chartHeight,
       computePath,
@@ -449,13 +524,35 @@ export default {
 }
 .rec-title {
   font-weight: 600;
+  color: #111827;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .rec-meta {
   color: #777;
   font-size: 0.85rem;
 }
 
+.rec-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.rec-label {
+  font-size: 0.78rem;
+  color: #6b7280;
+  background: #f3f4f6;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-weight: 600;
+  text-transform: none;
+}
+
 .rec-chart { margin-top: 8px; }
 .chart-svg { width: 100%; height: auto; display: block; }
 .chart-path { stroke: #3b82f6; }
+.rec-chart canvas { width: 100%; height: 80px; }
+.btn[disabled] { opacity: 0.6; pointer-events: none; }
 </style>
