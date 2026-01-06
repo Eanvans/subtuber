@@ -91,11 +91,8 @@
 
                     <!-- Inline line chart placeholder (comments over time) -->
                     <div class="rec-chart">
-                      <div style="height:80px; position:relative">
-                        <canvas :id="`chart-${v.id}`"></canvas>
-                      </div>
-                      <div style="margin-top:6px">
-                        <button class="btn btn-ghost" @click="loadAnalysis(v)" :disabled="analysisLoading[v.id]">{{ analysisLoading[v.id] ? '加载中...' : '加载分析' }}</button>
+                      <div style="height:140px; position:relative">
+                        <canvas :id="`chart-${v.video_id}`" style="width:100%; height:100%"></canvas>
                       </div>
                     </div>
 
@@ -116,7 +113,7 @@
 </template>
 
 <script>
-import { ref, onMounted, nextTick } from "vue";
+import { ref, onMounted, nextTick, onBeforeUnmount } from "vue";
 import { api } from "../api";
 import { getStreamers, getTwitchStatus, getAnalysis } from "../api/streamers";
 import Chart from "chart.js/auto";
@@ -180,11 +177,17 @@ export default {
           id: s.id,
           title: s.title || s.name || '未命名',
           platform: s.platform || '',
+          video_id: s.video_id || '',
           duration: s.duration_seconds || s.duration || '',
           created_at: s.created_at || null,
           points: s.points && s.points.length ? s.points : defaultPoints,
           raw: s,
         }));
+        // auto-load analysis for each VOD by default
+        for (const v of vods.value) {
+          // fire-and-forget; loadAnalysis will guard internally
+          loadAnalysis(v);
+        }
       } catch (e) {
         console.error('fetchStreamers error', e);
         vods.value = [];
@@ -196,10 +199,28 @@ export default {
     const charts = {};
     const analysisLoading = ref({});
 
+    const setCanvasToScreenWidth = (canvas) => {
+      if (!canvas) return;
+      const parent = canvas.parentElement || canvas.closest('div');
+      const w = parent ? parent.clientWidth : (window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth);
+      const h = parent ? parent.clientHeight : 120;
+      const dpr = window.devicePixelRatio || 1;
+      canvas.style.width = w + 'px';
+      canvas.width = Math.floor(w * dpr);
+      canvas.style.height = h + 'px';
+      canvas.height = Math.floor(h * dpr);
+    };
+
+    const formatOffset = (sec) => {
+      if (sec == null || isNaN(sec)) return '';
+      const m = Math.floor(sec / 60);
+      const s = Math.floor(sec % 60);
+      return `${m}:${String(s).padStart(2, '0')}`;
+    };
+
     const loadAnalysis = async (vod) => {
-      vod.id = 2661008731; // temp override for testing
-      if (!vod || !vod.id) return;
-      const vid = vod.id;
+      if (!vod || !vod.video_id) return;
+      const vid = vod.video_id;
       if (analysisMap.value[vid]) return; // already loaded
       try {
         analysisLoading.value = { ...analysisLoading.value, [vid]: true };
@@ -209,15 +230,27 @@ export default {
         analysisMap.value = { ...analysisMap.value, [vid]: series };
         await nextTick();
         const canvas = document.querySelector(`#chart-${vid}`);
-        if (canvas) {
-          const labels = series.map((p) => p.formatted_time || String(p.offset_seconds));
+          if (canvas) {
+          // ensure canvas internal size matches parent for crisp rendering
+          setCanvasToScreenWidth(canvas);
+          let labels = series.map((p) => p.formatted_time || formatOffset(p.offset_seconds));
+          labels = labels.map((l) => String(l));
           const values = series.map((p) => p.score ?? 0);
+          const pointBg = series.map((p) => p.is_peak ? '#ef4444' : '#3b82f6');
+          const pointRadii = series.map((p) => p.is_peak ? 6 : 2);
           if (charts[vid]) {
             charts[vid].data.labels = labels;
             charts[vid].data.datasets[0].data = values;
             charts[vid].update();
+            charts[vid].resize();
           } else {
             const ctx = canvas.getContext('2d');
+
+            // determine reasonable tick density based on canvas width
+            const canvasWidth = canvas.clientWidth || (window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth);
+            const approxLabelWidth = 100; // px per label
+            const maxTicksLimit = Math.max(2, Math.floor(canvasWidth / approxLabelWidth));
+            const step = Math.max(1, Math.ceil(labels.length / maxTicksLimit));
             charts[vid] = new Chart(ctx, {
               type: 'line',
               data: {
@@ -229,7 +262,9 @@ export default {
                     borderColor: '#3b82f6',
                     backgroundColor: 'rgba(59,130,246,0.08)',
                     tension: 0.3,
-                    pointRadius: 2,
+                    pointRadius: pointRadii,
+                    pointBackgroundColor: pointBg,
+                    pointHoverRadius: 7,
                     fill: true,
                   },
                 ],
@@ -239,7 +274,18 @@ export default {
                 maintainAspectRatio: false,
                 scales: {
                   x: {
-                    ticks: { maxRotation: 0, autoSkip: true },
+                    type: 'category',
+                    ticks: {
+                      maxRotation: 0,
+                      autoSkip: false,
+                      callback: function(val, idx) {
+                        // show every `step`-th label to avoid overlap; use labels array
+                        return (idx % step === 0) ? (labels[idx] || '') : '';
+                      },
+                      font: { size: 12 },
+                      padding: 6,
+                    },
+                    grid: { display: false },
                   },
                   y: {
                     beginAtZero: true,
@@ -247,7 +293,21 @@ export default {
                 },
                 plugins: {
                   legend: { display: false },
-                  tooltip: { mode: 'index', intersect: false },
+                  tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    callbacks: {
+                      title: (items) => {
+                        return items && items[0] ? items[0].label : '';
+                      },
+                      label: (ctx) => {
+                        const v = ctx.parsed.y;
+                        const idx = ctx.dataIndex;
+                        const peak = series[idx] && series[idx].is_peak ? ' (peak)' : '';
+                        return `Score: ${v}${peak}`;
+                      }
+                    }
+                  },
                 },
               },
             });
@@ -257,6 +317,15 @@ export default {
         console.error('loadAnalysis error', e);
       } finally {
         analysisLoading.value = { ...analysisLoading.value, [vid]: false };
+      }
+    };
+
+    const onResize = () => {
+      for (const vid of Object.keys(charts)) {
+        const canvas = document.querySelector(`#chart-${vid}`);
+        if (!canvas) continue;
+        setCanvasToScreenWidth(canvas);
+        try { charts[vid].resize(); } catch (e) { /* ignore */ }
       }
     };
 
@@ -315,6 +384,11 @@ export default {
       checkLive();
       setInterval(checkLive, 30000);
       fetchStreamers();
+      window.addEventListener('resize', onResize);
+    });
+
+    onBeforeUnmount(() => {
+      window.removeEventListener('resize', onResize);
     });
 
     const handleSearch = async () => {
@@ -532,6 +606,10 @@ export default {
 .rec-meta {
   color: #777;
   font-size: 0.85rem;
+}
+
+.rec-info{
+  width: 100%;
 }
 
 .rec-header {
