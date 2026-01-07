@@ -9,7 +9,8 @@ const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/', component: Home },
-    { path: '/settings', component: Settings }
+    { path: '/settings', component: Settings },
+    { path: '/recording/:video_id', name: 'recording', component: () => import('./views/RecordingDetail.vue') }
   ]
 })
 

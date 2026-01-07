@@ -1,20 +1,5 @@
 <template>
   <div class="home-page">
-    <nav class="navbar">
-      <div class="navbar-container">
-        <router-link to="/" class="brand">SubTuber</router-link>
-        <div class="nav-actions">
-          <router-link v-if="currentUser" to="/settings" class="btn btn-ghost"
-            ><i class="bi bi-person-circle" aria-hidden="true"></i>
-            {{ currentUser.displayName || currentUser.email }}</router-link
-          >
-          <button v-else class="btn btn-primary" @click="showLogin = true">
-            登录
-          </button>
-        </div>
-      </div>
-    </nav>
-
     <main class="main-content">
         <div class="card" style="max-width: 960px; margin: 0 auto">
           <div class="text-left mb-3">
@@ -81,7 +66,12 @@
             <!-- Mock recordings placeholders for future VODs -->
             <div class="recordings">
               <div class="recording-list">
-                <div class="recording-card" v-for="v in vods" :key="v.id">
+                <router-link
+                  v-for="v in vods"
+                  :key="v.id"
+                  :to="{ name: 'recording', params: { video_id: v.video_id } }"
+                  class="recording-card"
+                >
                   <div class="rec-info">
                     <div class="rec-header">
                       <span class="rec-label">直播标题</span>
@@ -97,19 +87,14 @@
                     </div>
 
                   </div>
-                </div>
+                </router-link>
               </div>
             </div>
           </div>
         </div>
     </main>
   </div>
-  <div v-if="showLogin" class="login-overlay">
-    <div class="login-card">
-      <button class="btn-close" @click="showLogin = false">×</button>
-      <Login @verified="onVerified" @sent="onSent" @error="onLoginError" />
-    </div>
-  </div>
+  
 </template>
 
 <script>
@@ -117,39 +102,13 @@ import { ref, onMounted, nextTick, onBeforeUnmount } from "vue";
 import { api } from "../api";
 import { getStreamers, getTwitchStatus, getAnalysis } from "../api/streamers";
 import Chart from "chart.js/auto";
-import Login from "../../../shared-auth/Login.vue";
 
 export default {
-  components: { Login },
   setup() {
     const searchQuery = ref("");
     const loading = ref(false);
     const results = ref([]);
     const error = ref("");
-    const showLogin = ref(false);
-    const currentUser = ref(null);
-    try {
-      const u = localStorage.getItem("UserInfo");
-      currentUser.value = u ? JSON.parse(u) : null;
-    } catch (e) {
-      currentUser.value = null;
-    }
-    const onVerified = (res) => {
-      showLogin.value = false;
-      const user = res && res.user ? res.user : null;
-      if (user) {
-        currentUser.value = user;
-        try {
-          localStorage.setItem("UserInfo", JSON.stringify(user));
-        } catch (e) {
-          console.error(e);
-        }
-      }
-    };
-    const onSent = () => {};
-    const onLoginError = (e) => {
-      console.error(e);
-    };
 
     // Live status refs
     const isLive = ref(false);
@@ -413,11 +372,6 @@ export default {
       error,
       handleSearch,
       subscribe,
-      showLogin,
-      onVerified,
-      onSent,
-      onLoginError,
-      currentUser,
       // live
       isLive,
       platforms,
@@ -595,6 +549,12 @@ export default {
   gap: 12px;
   align-items: center;
   margin-bottom: 10px;
+}
+.recording-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+  cursor: pointer;
+  transition: transform 140ms ease, box-shadow 140ms ease;
 }
 .rec-title {
   font-weight: 600;

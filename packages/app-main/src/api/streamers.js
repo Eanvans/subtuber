@@ -19,3 +19,15 @@ export async function getAnalysis(videoId) {
   const data = await res.json();
   return data || null;
 }
+
+export async function getAnalysisSummary(videoId, offsetSeconds) {
+  const params = new URLSearchParams();
+  if (videoId) params.append('video_id', videoId);
+  if (offsetSeconds !== undefined) params.append('offset_seconds', String(offsetSeconds));
+  
+  const url = `/api/twitch/analysis-summary?${params.toString()}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`/api/twitch/analysis-summary fetch failed`);
+  const data = await res.json();
+  return data && data.summary ? data.summary : null;
+}
