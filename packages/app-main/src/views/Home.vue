@@ -27,9 +27,17 @@
               :auto-refresh="true"
               :refresh-interval="30000"
             />
+            <AddStreamerCard @click="showAddModal = true" />
           </div>
         </div>
     </main>
+
+    <!-- 添加主播弹窗 -->
+    <AddStreamerModal
+      v-if="showAddModal"
+      @close="showAddModal = false"
+      @submit="handleAddStreamer"
+    />
   </div>
   
 </template>
@@ -40,32 +48,44 @@ import { api } from "../api";
 import { getStreamers, getTwitchStatus, getAnalysis } from "../api/streamers";
 import StreamerCard from "../components/StreamerCard.vue";
 import VODList from "../components/VODList.vue";
+import AddStreamerCard from "../components/AddStreamerCard.vue";
+import AddStreamerModal from "../components/AddStreamerModal.vue";
 
 export default {
   components: {
     StreamerCard,
-    VODList
+    VODList,
+    AddStreamerCard,
+    AddStreamerModal
   },
   setup() {
     const searchQuery = ref("");
     const loading = ref(false);
     const results = ref([]);
     const error = ref("");
+    const showAddModal = ref(false);
 
-    // Streamers list - can be expanded to support multiple streamers
-    const streamers = ref([
-      {
-        id: 'kanekolumi',
-        name: 'kanekolumi',
-        avatarUrl: 'https://static-cdn.jtvnw.net/jtv_user_pictures/7ef8599e-5252-43b4-a4fa-baff1a73e78c-profile_image-70x70.png'
+    // Streamers list - 从 localStorage 加载或使用默认值
+    const loadStreamers = () => {
+      try {
+        const saved = localStorage.getItem('subscribedStreamers');
+        if (saved) {
+          return JSON.parse(saved);
+        }
+      } catch (e) {
+        console.error('加载主播列表失败:', e);
       }
-      // 可以在这里添加更多主播
-      // {
-      //   id: 'another_streamer',
-      //   name: 'Another Streamer',
-      //   avatarUrl: 'https://...'
-      // }
-    ]);
+      // 默认主播列表
+      return [
+        {
+          id: 'kanekolumi',
+          name: 'kanekolumi',
+          avatarUrl: 'https://static-cdn.jtvnw.net/jtv_user_pictures/7ef8599e-5252-43b4-a4fa-baff1a73e78c-profile_image-70x70.png'
+        }
+      ];
+    };
+
+    const streamers = ref(loadStreamers());
 
     // per-vod analysis cache
     const analysisMap = ref({});
@@ -111,6 +131,33 @@ export default {
 
     const subscribe = () => alert("订阅功能开发中");
 
+    const handleAddStreamer = (streamerData) => {
+      // 检查是否已存在
+      const exists = streamers.value.some(s => s.id === streamerData.id);
+      if (exists) {
+        alert(`主播 "${streamerData.name}" 已在订阅列表中`);
+        return;
+      }
+
+      // 添加到列表
+      streamers.value.push({
+        id: streamerData.id,
+        name: streamerData.name,
+        avatarUrl: streamerData.avatarUrl || 'https://via.placeholder.com/70',
+        platform: streamerData.platform
+      });
+
+      // 保存到 localStorage
+      try {
+        localStorage.setItem('subscribedStreamers', JSON.stringify(streamers.value));
+      } catch (e) {
+        console.error('保存主播列表失败:', e);
+      }
+
+      showAddModal.value = false;
+      alert(`成功添加主播 "${streamerData.name}"！`);
+    };
+
     return {
       searchQuery,
       loading,
@@ -121,6 +168,8 @@ export default {
       streamers,
       analysisMap,
       getTwitchStatus,
+      showAddModal,
+      handleAddStreamer,
     };
   },
 };
