@@ -331,10 +331,10 @@ export default {
         loadingStatus.value = true;
         const data = await getTwitchStatus();
         isLive.value = !!data.is_live;
-        platforms.value = data.platforms || "twitch";
-        streamTitle.value = data.stream_data.title || "";
-        viewerCount.value = data.stream_data.viewer_count || data.viewers || null;
-        thumbnail.value = formatThumbnailUrl(data.stream_data.thumbnail_url || "");
+        platforms.value = data.platforms || ["Twitch"];
+        streamTitle.value = data.stream_data?.title || "";
+        viewerCount.value = data.stream_data?.viewer_count || data.viewers || null;
+        thumbnail.value = formatThumbnailUrl(data.stream_data?.thumbnail_url || "");
         liveUrl.value = data.url || data.stream_url || "https://www.twitch.tv/kanekolumi";
       } catch (e) {
         console.error("checkLive error", e);
