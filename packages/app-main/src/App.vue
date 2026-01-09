@@ -27,26 +27,20 @@
 <script>
 import { ref } from 'vue'
 import Login from '../../shared-auth/Login.vue'
+import { useAuth } from './composables/useAuth'
 
 export default {
   name: 'App',
   components: { Login },
   setup() {
     const showLogin = ref(false)
-    const currentUser = ref(null)
-    try {
-      const u = localStorage.getItem('UserInfo')
-      currentUser.value = u ? JSON.parse(u) : null
-    } catch (e) {
-      currentUser.value = null
-    }
+    const { currentUser, setUser } = useAuth()
 
     const onVerified = (res) => {
       showLogin.value = false
       const user = res && res.user ? res.user : null
       if (user) {
-        currentUser.value = user
-        try { localStorage.setItem('UserInfo', JSON.stringify(user)) } catch (e) { console.error(e) }
+        setUser(user)
       }
     }
     const onSent = () => {}
