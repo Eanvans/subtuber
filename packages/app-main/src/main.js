@@ -10,6 +10,7 @@ const router = createRouter({
   routes: [
     { path: '/', component: Home },
     { path: '/settings', component: Settings },
+    { path: '/streamer/:streamer_id', name: 'streamer-detail', component: () => import('./views/StreamerDetail.vue') },
     { path: '/recording/:video_id', name: 'recording', component: () => import('./views/RecordingDetail.vue') }
   ]
 })
