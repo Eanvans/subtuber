@@ -13,7 +13,18 @@
             <span class="rec-label">直播标题</span>
             <div class="rec-title" :title="v.title">{{ v.title }}</div>
           </div>
-          <div class="rec-meta">{{ v.platform }} · {{ v.duration }}</div>
+          <div class="rec-meta">
+            <span class="platform-tag">
+              <svg v-if="pDisplay(v.platform) === 'Twitch'" class="platform-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="2" y="3" width="16" height="14" rx="2" ry="2" fill="#6441A5" />
+                <path d="M6 19v2h3v-2" fill="#6441A5" />
+                <path d="M9 7h2v3H9zM13 7h2v3h-2z" fill="#fff" />
+              </svg>
+              {{ pDisplay(v.platform) }}
+            </span>
+            <span>·</span>
+            <span>时长: {{ v.duration }}</span>
+          </div>
         </div>
       </router-link>
     </div>
@@ -21,6 +32,8 @@
 </template>
 
 <script>
+import { formatPlatformName } from '../utils/platform'
+
 export default {
   name: 'VODList',
   props: {
@@ -31,6 +44,11 @@ export default {
     title: {
       type: String,
       default: '近期直播回放'
+    }
+  },
+  setup() {
+    return {
+      pDisplay: formatPlatformName
     }
   }
 }
@@ -84,6 +102,26 @@ export default {
 .rec-meta {
   color: #777;
   font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.platform-tag {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: #f3f4f6;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.platform-icon {
+  width: 12px;
+  height: 12px;
 }
 
 .rec-info {

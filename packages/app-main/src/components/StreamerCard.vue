@@ -68,6 +68,7 @@
 
 <script>
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
+import { formatPlatformName, formatViewerCount } from '../utils/platform'
 
 export default {
   name: 'StreamerCard',
@@ -108,22 +109,6 @@ export default {
     const loadingStatus = ref(false)
 
     let intervalId = null
-
-    const pDisplay = (p) => {
-      if (!p) return "未知平台"
-      const key = p.toLowerCase()
-      if (key.includes("twitch")) return "Twitch"
-      if (key.includes("youtube")) return "YouTube"
-      return p
-    }
-
-    const formatViewerCount = (count) => {
-      if (!count) return '0'
-      if (count >= 1000) {
-        return (count / 1000).toFixed(1) + 'K'
-      }
-      return count.toString()
-    }
 
     const openLiveStream = (event) => {
       // 阻止事件冒泡，避免触发 router-link 的跳转
@@ -183,7 +168,7 @@ export default {
       liveUrl,
       statusChecked,
       loadingStatus,
-      pDisplay,
+      pDisplay: formatPlatformName,
       formatViewerCount
     }
   }

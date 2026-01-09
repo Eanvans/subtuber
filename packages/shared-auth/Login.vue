@@ -223,6 +223,7 @@ onMounted(() => {
   border: 1px solid #e6e7eb;
   background: var(--input-bg, #fff);
   transition: box-shadow 0.12s, border-color 0.12s;
+  box-sizing: border-box;
 }
 .form-control:focus {
   outline: none;
