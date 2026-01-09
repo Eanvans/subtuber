@@ -88,11 +88,6 @@ export default {
           created_at: s.created_at || null,
           raw: s,
         }))
-
-        // 加载每个 VOD 的分析数据
-        for (const v of vods.value) {
-          loadAnalysis(v)
-        }
       } catch (e) {
         console.error('fetchStreamerVODs error', e)
         vods.value = []
@@ -172,16 +167,10 @@ export default {
 }
 
 .btn-ghost {
-  background: transparent;
   border: none;
   color: var(--muted, #374151);
   padding: 0.5rem 1rem;
   cursor: pointer;
   font-size: 1rem;
-}
-
-.btn-ghost:hover {
-  background: var(--bg, #f1f5f9);
-  border-radius: 6px;
 }
 </style>

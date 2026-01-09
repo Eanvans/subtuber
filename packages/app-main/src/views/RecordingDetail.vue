@@ -10,6 +10,14 @@
         <div><strong>主播:</strong> {{ analysis.streamer_name || '-' }}</div>
       </div>
 
+      <!-- 时间序列折线图 -->
+      <section class="time-series-chart">
+        <h3>直播热度趋势</h3>
+        <div class="chart-container">
+          <canvas id="timeSeriesChart" style="width:100%; height:100%"></canvas>
+        </div>
+      </section>
+
       <section class="hot-moments">
         <div v-if="!hotMoments.length">没有可展示的片段。</div>
         <div class="moments-list">
@@ -40,12 +48,14 @@
 </template>
 
 <script>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getAnalysis, getAnalysisSummary } from '../api/streamers'
+import Chart from 'chart.js/auto'
 
 export default {
   setup() {
+    let chartInstance = null
     const route = useRoute()
     const router = useRouter()
     const videoId = route.params.video_id
@@ -53,6 +63,7 @@ export default {
     const error = ref('')
     const analysis = ref({})
     const hotMoments = ref([])
+    const timeSeriesData = ref([])
 
     const formatOffset = (sec) => {
       if (sec == null || isNaN(sec)) return ''
@@ -99,6 +110,84 @@ export default {
       moment.expanded = !moment.expanded
     }
 
+    const renderTimeSeriesChart = async () => {
+      const canvas = document.getElementById('timeSeriesChart')
+      console.log('Rendering chart on canvas:', canvas, 'timeSeriesData length:', timeSeriesData.value.length)
+      if (!canvas || timeSeriesData.value.length === 0) return
+
+      const series = timeSeriesData.value
+      const labels = series.map((p) => p.formatted_time || formatOffset(p.offset_seconds))
+      const values = series.map((p) => p.score ?? 0)
+      const pointBg = series.map((p) => p.is_peak ? '#ef4444' : '#3b82f6')
+      const pointRadii = series.map((p) => p.is_peak ? 6 : 2)
+
+      if (chartInstance) {
+        chartInstance.destroy()
+      }
+
+      const ctx = canvas.getContext('2d')
+      const canvasWidth = canvas.clientWidth || 800
+      const approxLabelWidth = 100
+      const maxTicksLimit = Math.max(2, Math.floor(canvasWidth / approxLabelWidth))
+      const step = Math.max(1, Math.ceil(labels.length / maxTicksLimit))
+
+      chartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Score',
+            data: values,
+            borderColor: '#3b82f6',
+            backgroundColor: 'rgba(59,130,246,0.08)',
+            tension: 0.3,
+            pointRadius: pointRadii,
+            pointBackgroundColor: pointBg,
+            pointHoverRadius: 7,
+            fill: true,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: {
+              type: 'category',
+              ticks: {
+                maxRotation: 0,
+                autoSkip: false,
+                callback: function(val, idx) {
+                  return (idx % step === 0) ? (labels[idx] || '') : ''
+                },
+                font: { size: 12 },
+                padding: 6,
+              },
+              grid: { display: false },
+            },
+            y: {
+              beginAtZero: true,
+            },
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              mode: 'index',
+              intersect: false,
+              callbacks: {
+                title: (items) => items && items[0] ? items[0].label : '',
+                label: (ctx) => {
+                  const v = ctx.parsed.y
+                  const idx = ctx.dataIndex
+                  const peak = series[idx] && series[idx].is_peak ? ' (peak)' : ''
+                  return `Score: ${v}${peak}`
+                }
+              }
+            },
+          },
+        },
+      })
+    }
+
     onMounted(async () => {
       if (!videoId) {
         error.value = '缺少 video_id'
@@ -110,6 +199,7 @@ export default {
         const data = await getAnalysis(videoId)
         analysis.value = data || {}
         hotMoments.value = (data && data.hot_moments) ? data.hot_moments : []
+        timeSeriesData.value = (data && data.time_series_data) ? data.time_series_data : []
 
          // 异步加载每个热点时段的分析摘要
         if (hotMoments.value.length > 0) {
@@ -137,6 +227,12 @@ export default {
         error.value = '加载失败'
       } finally {
         loading.value = false
+        
+        // 渲染时间序列折线图 - 必须在 loading 为 false 后才能渲染
+        if (timeSeriesData.value.length > 0) {
+          await nextTick() // 等待 v-else 块渲染完成
+          await renderTimeSeriesChart()
+        }
       }
     })
 
@@ -146,6 +242,7 @@ export default {
       error,
       analysis,
       hotMoments,
+      timeSeriesData,
       formatOffset,
       intervalRange,
       toggleExpand,
@@ -161,6 +258,25 @@ export default {
   gap: 12px;
   margin-bottom: 12px;
   color: var(--muted);
+}
+
+.time-series-chart {
+  margin: 1.5rem 0;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.time-series-chart h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 1rem;
+}
+
+.chart-container {
+  height: 200px;
+  position: relative;
 }
 
 .moments-list {
