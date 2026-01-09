@@ -177,7 +177,7 @@ export default {
 
 <style scoped>
 .home-page {
-  min-height: 100vh;
+  min-height: 70vh;
   display: flex;
   flex-direction: column;
 }
@@ -188,7 +188,7 @@ export default {
 }
 
 .card {
-  min-height: 70vh;
+  padding-bottom: 1rem;
 }
 
 .result-item {
