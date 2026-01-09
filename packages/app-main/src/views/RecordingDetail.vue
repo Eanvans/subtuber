@@ -112,7 +112,6 @@ export default {
 
     const renderTimeSeriesChart = async () => {
       const canvas = document.getElementById('timeSeriesChart')
-      console.log('Rendering chart on canvas:', canvas, 'timeSeriesData length:', timeSeriesData.value.length)
       if (!canvas || timeSeriesData.value.length === 0) return
 
       const series = timeSeriesData.value
