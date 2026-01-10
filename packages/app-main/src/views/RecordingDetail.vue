@@ -83,6 +83,18 @@
         </transition>
       </section>
 
+      <!-- AI分析参数说明 -->
+      <div class="ai-params-notice">
+        <div class="notice-icon">ℹ️</div>
+        <div class="notice-content">
+          <div class="notice-title">AI 分析参数说明</div>
+          <div class="notice-text">
+            当前使用默认参数: 窗口长度 420秒 (7分钟) | 阈值 0.9 (90百分位) | 搜索范围 210秒 (3.5分钟)
+          </div>
+          <div class="notice-dev">⚠️ 实时更新 AI 总结功能还在开发中</div>
+        </div>
+      </div>
+
       <section class="hot-moments">
         <div v-if="!hotMoments.length">没有可展示的片段。</div>
         <div class="moments-list">
@@ -134,7 +146,7 @@ export default {
     const analysisParams = ref({
       windows_len: 420,
       thr: 0.90,
-      search_range: 60
+      search_range: 210
     })
 
     const formatOffset = (sec) => {
@@ -369,6 +381,47 @@ export default {
   background: #fff;
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.ai-params-notice {
+  display: flex;
+  gap: 0.8rem;
+  padding: 1rem 1.2rem;
+  margin: 1.5rem 0 1rem 0;
+  background: #eff6ff;
+  border-left: 4px solid #3b82f6;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(59, 130, 246, 0.1);
+}
+
+.notice-icon {
+  font-size: 1.3rem;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.notice-content {
+  flex: 1;
+}
+
+.notice-title {
+  font-weight: 600;
+  color: #1e40af;
+  font-size: 0.95rem;
+  margin-bottom: 0.4rem;
+}
+
+.notice-text {
+  font-size: 0.88rem;
+  color: #1e3a8a;
+  line-height: 1.5;
+  margin-bottom: 0.3rem;
+}
+
+.notice-dev {
+  font-size: 0.85rem;
+  color: #92400e;
+  font-style: italic;
 }
 
 .time-series-chart h3 {
