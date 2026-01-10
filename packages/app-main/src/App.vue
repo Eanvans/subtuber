@@ -33,21 +33,9 @@
             <div class="qr-codes">
               <div class="qr-item">
                 <div class="qr-placeholder">
-                  <svg width="60" height="60" viewBox="0 0 60 60" fill="none">
-                    <rect width="60" height="60" rx="4" fill="#f3f4f6"/>
-                    <text x="30" y="35" text-anchor="middle" fill="#6b7280" font-size="10">QQ群</text>
-                  </svg>
+                  <img src="../images/qq.png" alt="QQ群二维码" class="qr-image" />
                 </div>
                 <span class="qr-label">QQ群</span>
-              </div>
-              <div class="qr-item">
-                <div class="qr-placeholder">
-                  <svg width="60" height="60" viewBox="0 0 60 60" fill="none">
-                    <rect width="60" height="60" rx="4" fill="#f3f4f6"/>
-                    <text x="30" y="35" text-anchor="middle" fill="#6b7280" font-size="10">微信</text>
-                  </svg>
-                </div>
-                <span class="qr-label">微信</span>
               </div>
             </div>
           </div>
@@ -219,6 +207,13 @@ export default {
   border-radius: 6px;
   overflow: hidden;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.qr-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .qr-label {
