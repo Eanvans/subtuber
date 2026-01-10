@@ -12,9 +12,18 @@ export async function getTwitchStatus() {
   return data || {};
 }
 
-export async function getAnalysis(videoId) {
+export async function getAnalysis(videoId, windowsLen, thr, searchRange) {
   if (!videoId) throw new Error('videoId required');
-  const res = await fetch(`/api/twitch/analysis/${encodeURIComponent(videoId)}`);
+  
+  const params = new URLSearchParams();
+  if (windowsLen !== undefined) params.append('windows_len', String(windowsLen));
+  if (thr !== undefined) params.append('thr', String(thr));
+  if (searchRange !== undefined) params.append('search_range', String(searchRange));
+  
+  const queryString = params.toString();
+  const url = `/api/twitch/analysis/${encodeURIComponent(videoId)}${queryString ? '?' + queryString : ''}`;
+  
+  const res = await fetch(url);
   if (!res.ok) throw new Error(`/api/twitch/analysis/${videoId} fetch failed`);
   const data = await res.json();
   return data || null;

@@ -18,6 +18,71 @@
         </div>
       </section>
 
+      <!-- 高级参数调节 (可折叠) -->
+      <section class="advanced-params">
+        <div class="advanced-toggle" @click="showAdvanced = !showAdvanced">
+          <span class="toggle-icon">{{ showAdvanced ? '▼' : '▶' }}</span>
+          <span class="toggle-text">高级参数调节</span>
+          <span class="toggle-hint">(调整分析算法参数)</span>
+        </div>
+        
+        <transition name="slide-fade">
+          <div v-show="showAdvanced" class="advanced-content">
+            <div class="params-grid">
+              <div class="param-item">
+                <label>
+                  <span class="param-label">窗口长度 (s)</span>
+                  <span class="param-value">{{ analysisParams.windows_len }}</span>
+                </label>
+                <input 
+                  type="range" 
+                  v-model.number="analysisParams.windows_len" 
+                  min="60" 
+                  max="600" 
+                  step="10"
+                />
+                <div class="param-hint">范围: 60-600秒, 控制分析窗口大小</div>
+              </div>
+
+              <div class="param-item">
+                <label>
+                  <span class="param-label">阈值</span>
+                  <span class="param-value">{{ analysisParams.thr.toFixed(2) }}</span>
+                </label>
+                <input 
+                  type="range" 
+                  v-model.number="analysisParams.thr" 
+                  min="0.5" 
+                  max="1.0" 
+                  step="0.01"
+                />
+                <div class="param-hint">范围: 0.50-1.00, 热点检测敏感度阈值</div>
+              </div>
+
+              <div class="param-item">
+                <label>
+                  <span class="param-label">搜索范围 (s)</span>
+                  <span class="param-value">{{ analysisParams.search_range }}</span>
+                </label>
+                <input 
+                  type="range" 
+                  v-model.number="analysisParams.search_range" 
+                  min="30" 
+                  max="300" 
+                  step="5"
+                />
+                <div class="param-hint">范围: 30-300秒, 峰值搜索范围</div>
+              </div>
+            </div>
+            <div class="advanced-actions">
+              <button class="btn btn-primary" @click="refreshAnalysis" :disabled="refreshing">
+                {{ refreshing ? '更新中...' : '应用参数并刷新' }}
+              </button>
+            </div>
+          </div>
+        </transition>
+      </section>
+
       <section class="hot-moments">
         <div v-if="!hotMoments.length">没有可展示的片段。</div>
         <div class="moments-list">
@@ -64,6 +129,13 @@ export default {
     const analysis = ref({})
     const hotMoments = ref([])
     const timeSeriesData = ref([])
+    const refreshing = ref(false)
+    const showAdvanced = ref(false)
+    const analysisParams = ref({
+      windows_len: 420,
+      thr: 0.90,
+      search_range: 60
+    })
 
     const formatOffset = (sec) => {
       if (sec == null || isNaN(sec)) return ''
@@ -187,15 +259,14 @@ export default {
       })
     }
 
-    onMounted(async () => {
-      if (!videoId) {
-        error.value = '缺少 video_id'
-        loading.value = false
-        return
-      }
-       
+    const fetchAnalysisData = async () => {
       try {
-        const data = await getAnalysis(videoId)
+        const data = await getAnalysis(
+          videoId, 
+          analysisParams.value.windows_len,
+          analysisParams.value.thr,
+          analysisParams.value.search_range
+        )
         analysis.value = data || {}
         hotMoments.value = (data && data.hot_moments) ? data.hot_moments : []
         timeSeriesData.value = (data && data.time_series_data) ? data.time_series_data : []
@@ -224,14 +295,44 @@ export default {
       } catch (e) {
         console.error('RecordingDetail getAnalysis error', e)
         error.value = '加载失败'
-      } finally {
-        loading.value = false
+      }
+    }
+
+    const refreshAnalysis = async () => {
+      if (refreshing.value) return
+      refreshing.value = true
+      error.value = ''
+      
+      try {
+        await fetchAnalysisData()
         
-        // 渲染时间序列折线图 - 必须在 loading 为 false 后才能渲染
+        // 重新渲染图表
         if (timeSeriesData.value.length > 0) {
-          await nextTick() // 等待 v-else 块渲染完成
+          await nextTick()
           await renderTimeSeriesChart()
         }
+      } catch (e) {
+        console.error('Refresh analysis error', e)
+        error.value = '刷新失败'
+      } finally {
+        refreshing.value = false
+      }
+    }
+
+    onMounted(async () => {
+      if (!videoId) {
+        error.value = '缺少 video_id'
+        loading.value = false
+        return
+      }
+       
+      await fetchAnalysisData()
+      loading.value = false
+      
+      // 渲染时间序列折线图 - 必须在 loading 为 false 后才能渲染
+      if (timeSeriesData.value.length > 0) {
+        await nextTick() // 等待 v-else 块渲染完成
+        await renderTimeSeriesChart()
       }
     })
 
@@ -242,9 +343,13 @@ export default {
       analysis,
       hotMoments,
       timeSeriesData,
+      analysisParams,
+      refreshing,
+      showAdvanced,
       formatOffset,
       intervalRange,
       toggleExpand,
+      refreshAnalysis,
       router,
     }
   }
@@ -367,5 +472,179 @@ export default {
   font-size: 0.9rem
 }
 
+.advanced-params {
+  margin: 1.5rem 0;
+  background: #ffffff;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+}
+
+.advanced-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem 1.2rem;
+  cursor: pointer;
+  background: #f9fafb;
+  transition: background 0.2s;
+  user-select: none;
+}
+
+.advanced-toggle:hover {
+  background: #f3f4f6;
+}
+
+.toggle-icon {
+  font-size: 0.8rem;
+  color: #6b7280;
+  width: 16px;
+  display: inline-block;
+  transition: transform 0.2s;
+}
+
+.toggle-text {
+  font-weight: 600;
+  color: #374151;
+  font-size: 0.95rem;
+}
+
+.toggle-hint {
+  color: #9ca3af;
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+.advanced-content {
+  padding: 1.5rem;
+  background: #fafbfc;
+  border-top: 1px solid #e5e7eb;
+}
+
+.params-grid {
+  display: grid;
+  gap: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.param-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.param-item label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 500;
+  color: #1f2937;
+}
+
+.param-label {
+  font-size: 0.95rem;
+}
+
+.param-value {
+  font-size: 1rem;
+  color: #3b82f6;
+  font-weight: 600;
+  min-width: 60px;
+  text-align: right;
+}
+
+.param-item input[type="range"] {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: #e5e7eb;
+  outline: none;
+  -webkit-appearance: none;
+}
+
+.param-item input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #3b82f6;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.param-item input[type="range"]::-webkit-slider-thumb:hover {
+  background: #2563eb;
+}
+
+.param-item input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #3b82f6;
+  cursor: pointer;
+  border: none;
+  transition: background 0.2s;
+}
+
+.param-item input[type="range"]::-moz-range-thumb:hover {
+  background: #2563eb;
+}
+
+.param-hint {
+  font-size: 0.85rem;
+  color: #6b7280;
+  font-style: italic;
+}
+
+.advanced-actions {
+  margin-top: 1.2rem;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.btn-primary {
+  background: #3b82f6;
+  color: white;
+  padding: 0.6rem 1.5rem;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 0.95rem;
+  transition: all 0.2s;
+  box-shadow: 0 1px 3px rgba(59, 130, 246, 0.3);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #2563eb;
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.4);
+  transform: translateY(-1px);
+}
+
+.btn-primary:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* 折叠动画 */
+.slide-fade-enter-active {
+  transition: all 0.3s ease;
+}
+
+.slide-fade-leave-active {
+  transition: all 0.3s ease;
+}
+
+.slide-fade-enter-from {
+  transform: translateY(-10px);
+  opacity: 0;
+}
+
+.slide-fade-leave-to {
+  transform: translateY(-10px);
+  opacity: 0;
+}
 
 </style>
