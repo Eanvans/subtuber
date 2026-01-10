@@ -24,6 +24,8 @@
             </span>
             <span>·</span>
             <span>时长: {{ v.duration }}</span>
+            <span v-if="v.created_at">·</span>
+            <span v-if="v.created_at">{{ formatCreatedAt(v.created_at) }}</span>
           </div>
         </div>
       </router-link>
@@ -33,6 +35,7 @@
 
 <script>
 import { formatPlatformName } from '../utils/platform'
+import { formatCreatedAt } from '../utils/dateFormat'
 
 export default {
   name: 'VODList',
@@ -48,7 +51,8 @@ export default {
   },
   setup() {
     return {
-      pDisplay: formatPlatformName
+      pDisplay: formatPlatformName,
+      formatCreatedAt
     }
   }
 }
