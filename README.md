@@ -1,4 +1,4 @@
-# LumiTime - 前后端分离项目
+# Subtuber - 前后端分离项目
 
 这是一个使用 Vite 3 + Vue 3 的前后端分离项目，后端使用 Go + Gin。
 
@@ -119,70 +119,6 @@ npm run build
 ```bash
 # 将构建文件上传到服务器
 scp -r dist/* user@your-server:/var/www/subtuber/fe/dist/
-```
-
-### 3. 配置 Nginx
-
-创建或编辑 Nginx 配置文件（例如 `/etc/nginx/sites-available/oshivtuber`）：
-
-```nginx
-server {
-    listen 80;
-    server_name oshivtuber.xyz www.oshivtuber.xyz;
-
-    root /var/www/subtuber/fe/dist;
-    index index.html index.htm;
-
-    # API 反向代理
-    location /api {
-        proxy_pass http://localhost:8080;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
-    }
-
-    # 图片资源反向代理
-    location /img {
-        proxy_pass http://localhost:8080;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    # Vue Router history 模式支持
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-}
-```
-
-### 4. 启用配置并重启 Nginx
-
-```bash
-# 创建软链接（如果需要）
-sudo ln -s /etc/nginx/sites-available/oshivtuber /etc/nginx/sites-enabled/
-
-# 测试配置
-sudo nginx -t
-
-# 重新加载 Nginx
-sudo nginx -s reload
-```
-
-### 5. 启动后端服务
-
-确保后端 Go 服务运行在 8080 端口：
-
-```bash
-go build -o lumitime main.go routes.go
-./lumitime
 ```
 
 ## 开发注意事项
