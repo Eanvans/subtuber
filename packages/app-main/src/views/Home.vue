@@ -22,7 +22,7 @@
               :key="streamer.id"
               :streamer-name="streamer.name"
               :streamer-id="streamer.id"
-              :avatar-url="streamer.avatarUrl"
+              :avatar-url="streamer.profile_image_url"
               :check-status-fn="getTwitchStatus"
               :auto-refresh="true"
               :refresh-interval="30000"

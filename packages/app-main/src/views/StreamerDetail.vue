@@ -52,7 +52,7 @@ export default {
     })
 
     const avatarUrl = computed(() => {
-      return streamerInfo.value?.avatarUrl || streamerInfo.value?.avatar_url || ''
+      return streamerInfo.value?.profile_image_url || streamerInfo.value?.avatar_url || ''
     })
 
     const loadAnalysis = async (vod) => {
@@ -78,7 +78,7 @@ export default {
         if (data.length > 0 && data[0].streamer_name) {
           streamerInfo.value = {
             name: data[0].streamer_name,
-            avatarUrl: data[0].avatar_url || ''
+            profile_image_url: data[0].avatar_url || ''
           }
         }
         
