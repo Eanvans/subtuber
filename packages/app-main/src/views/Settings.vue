@@ -167,6 +167,9 @@ export default {
   color: var(--muted-2, #6b7280);
   background: var(--bg, #f8fafc);
   padding: 0.75rem;
+  border-radius: 4px;
+  word-break: break-all;
+}
 
 .btn {
   padding: 0.625rem 1.25rem;
@@ -188,15 +191,11 @@ export default {
 }
 
 .btn-ghost {
-  background: transparent;
   color: var(--muted, #374151);
 }
 
 .btn-ghost:hover {
   background: var(--bg, #f1f5f9);
-}
-  border-radius: 4px;
-  word-break: break-all;
 }
 
 .empty-state {

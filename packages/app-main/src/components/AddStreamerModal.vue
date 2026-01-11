@@ -13,50 +13,16 @@
       
       <div class="modal-body">
         <div class="form-group">
-          <label for="streamer-id">主播 ID *</label>
+          <label for="stream-url">直播间链接 *</label>
           <input
-            id="streamer-id"
-            v-model="formData.id"
-            type="text"
-            placeholder="例如: kanekolumi"
-            class="form-input"
-            @keyup.enter="handleSubmit"
-          />
-          <span class="input-hint">主播在平台上的唯一标识</span>
-        </div>
-        
-        <div class="form-group">
-          <label for="streamer-name">显示名称 *</label>
-          <input
-            id="streamer-name"
-            v-model="formData.name"
-            type="text"
-            placeholder="例如: Kaneko Lumi"
-            class="form-input"
-            @keyup.enter="handleSubmit"
-          />
-        </div>
-        
-        <div class="form-group">
-          <label for="avatar-url">头像链接</label>
-          <input
-            id="avatar-url"
-            v-model="formData.avatarUrl"
+            id="stream-url"
+            v-model="formData.streamUrl"
             type="url"
-            placeholder="https://..."
+            placeholder="例如: https://www.twitch.tv/kanekolumi"
             class="form-input"
             @keyup.enter="handleSubmit"
           />
-          <span class="input-hint">可选，留空使用默认头像</span>
-        </div>
-        
-        <div class="form-group">
-          <label for="platform">平台</label>
-          <select id="platform" v-model="formData.platform" class="form-input">
-            <option value="twitch">Twitch</option>
-            <option value="youtube">YouTube</option>
-            <option value="other">其他</option>
-          </select>
+          <span class="input-hint">输入主播的完整直播间链接，目前支持 Twitch 平台</span>
         </div>
       </div>
       
@@ -84,32 +50,74 @@ export default {
   emits: ['close', 'submit'],
   setup(props, { emit }) {
     const formData = ref({
-      id: '',
-      name: '',
-      avatarUrl: '',
-      platform: 'twitch'
+      streamUrl: ''
     })
 
     const isValid = computed(() => {
-      return formData.value.id.trim() !== '' && formData.value.name.trim() !== ''
+      const url = formData.value.streamUrl.trim()
+      if (!url) return false
+      
+      // 简单验证是否包含常见的直播平台域名
+      const validPlatforms = ['twitch.tv', 'youtube.com', 'youtu.be', 'bilibili.com']
+      return validPlatforms.some(platform => url.includes(platform))
     })
+
+    const parseStreamUrl = (url) => {
+      try {
+        const urlObj = new URL(url)
+        let platform = 'other'
+        let id = ''
+        let name = ''
+
+        if (urlObj.hostname.includes('twitch.tv')) {
+          platform = 'twitch'
+          // https://www.twitch.tv/username
+          const pathParts = urlObj.pathname.split('/').filter(Boolean)
+          id = pathParts[0] || ''
+          name = id
+        } else if (urlObj.hostname.includes('youtube.com') || urlObj.hostname.includes('youtu.be')) {
+          platform = 'youtube'
+          // https://www.youtube.com/@username 或 /channel/xxx
+          const pathParts = urlObj.pathname.split('/').filter(Boolean)
+          if (pathParts[0] === '@') {
+            id = pathParts[1] || pathParts[0]
+            name = pathParts[1] || pathParts[0]
+          } else {
+            id = pathParts[pathParts.length - 1] || ''
+            name = id
+          }
+        } else if (urlObj.hostname.includes('bilibili.com')) {
+          platform = 'bilibili'
+          // https://live.bilibili.com/12345
+          const pathParts = urlObj.pathname.split('/').filter(Boolean)
+          id = pathParts[pathParts.length - 1] || ''
+          name = id
+        }
+
+        return { platform, id, name }
+      } catch (e) {
+        console.error('URL解析失败:', e)
+        return null
+      }
+    }
 
     const handleSubmit = () => {
       if (!isValid.value) return
       
+      const parsed = parseStreamUrl(formData.value.streamUrl.trim())
+      if (!parsed || !parsed.id) {
+        alert('无法解析直播间链接，请检查链接是否正确')
+        return
+      }
+      
       emit('submit', {
-        id: formData.value.id.trim(),
-        name: formData.value.name.trim(),
-        avatarUrl: formData.value.avatarUrl.trim() || '',
-        platform: formData.value.platform
+        streamer_id: parsed.id,
+        platform: parsed.platform
       })
       
       // 重置表单
       formData.value = {
-        id: '',
-        name: '',
-        avatarUrl: '',
-        platform: 'twitch'
+        streamUrl: ''
       }
     }
 

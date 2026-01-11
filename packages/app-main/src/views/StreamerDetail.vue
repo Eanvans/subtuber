@@ -30,7 +30,7 @@
 <script>
 import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { getStreamers, getAnalysis } from '../api/streamers'
+import { getStreamerVODs, getAnalysis } from '../api/streamers'
 import VODList from '../components/VODList.vue'
 
 export default {
@@ -44,18 +44,15 @@ export default {
     const loading = ref(true)
     const vods = ref([])
     const analysisMap = ref({})
+    const streamerInfo = ref(null)
 
     // 这里可以从 streamers 配置或 API 获取头像
     const streamerName = computed(() => {
-      return streamerId || '主播'
+      return streamerInfo.value?.name || streamerId || '主播'
     })
 
     const avatarUrl = computed(() => {
-      // 根据 streamerId 返回对应的头像
-      const avatars = {
-        'kanekolumi': 'https://static-cdn.jtvnw.net/jtv_user_pictures/7ef8599e-5252-43b4-a4fa-baff1a73e78c-profile_image-70x70.png'
-      }
-      return avatars[streamerId] || ''
+      return streamerInfo.value?.avatarUrl || streamerInfo.value?.avatar_url || ''
     })
 
     const loadAnalysis = async (vod) => {
@@ -75,18 +72,23 @@ export default {
     const fetchStreamerVODs = async () => {
       try {
         loading.value = true
-        const list = await getStreamers()
+        const data = await getStreamerVODs(streamerId)
         
-        // 可以在这里过滤特定主播的 VODs
-        // 目前先显示所有的
-        vods.value = list.map((s) => ({
-          id: s.id,
-          title: s.title || s.name || '未命名',
-          platform: s.platform || '',
-          video_id: s.video_id || '',
-          duration: s.duration_seconds || s.duration || '',
-          created_at: s.created_at || null,
-          raw: s,
+        // 如果返回的数据包含主播信息
+        if (data.length > 0 && data[0].streamer_name) {
+          streamerInfo.value = {
+            name: data[0].streamer_name,
+            avatarUrl: data[0].avatar_url || ''
+          }
+        }
+        
+        vods.value = data.map((vod) => ({
+          id: vod.id || vod.video_id,
+          title: vod.title || '未命名',
+          platform: vod.platform || 'twitch',
+          video_id: vod.video_id,
+          duration: vod.duration || vod.duration_seconds || '',
+          created_at: vod.created_at || null
         }))
       } catch (e) {
         console.error('fetchStreamerVODs error', e)

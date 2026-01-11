@@ -5,9 +5,24 @@ export async function getStreamers() {
   return (data && data.streamers) ? data.streamers : [];
 }
 
-export async function getTwitchStatus() {
-  const res = await fetch('/api/twitch/status');
-  if (!res.ok) throw new Error('/api/twitch/status fetch failed');
+export async function getStreamerVODs(streamerId) {
+  if (!streamerId) throw new Error('streamerId required');
+  const res = await fetch(`/api/streamers/${encodeURIComponent(streamerId)}`);
+  if (!res.ok) throw new Error(`/api/streamers/${streamerId} fetch failed`);
+  const data = await res.json();
+  return (data && data.vods) ? data.vods : [];
+}
+
+export async function getTwitchStatus(streamerId) {
+  if (!streamerId) {
+    const res = await fetch('/api/twitch/status');
+    if (!res.ok) throw new Error('/api/twitch/status fetch failed');
+    const data = await res.json();
+    return data || {};
+  }
+  
+  const res = await fetch(`/api/twitch/status/${encodeURIComponent(streamerId)}`);
+  if (!res.ok) throw new Error(`/api/twitch/status/${streamerId} fetch failed`);
   const data = await res.json();
   return data || {};
 }
@@ -39,4 +54,21 @@ export async function getAnalysisSummary(videoId, offsetSeconds) {
   if (!res.ok) throw new Error(`/api/twitch/analysis-summary fetch failed`);
   const data = await res.json();
   return data && data.summary ? data.summary : null;
+}
+
+export async function subscribeStreamer(streamerData) {
+  const res = await fetch('/api/streamers/subscribe', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(streamerData)
+  });
+  
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || '订阅主播失败');
+  }
+  
+  return await res.json();
 }

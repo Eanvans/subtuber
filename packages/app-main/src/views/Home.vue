@@ -12,7 +12,7 @@
             >
               订阅你喜欢的主播
             </h2>
-            <p class="subtitle">自动获取lumi近期直播中的高光时刻以及ai分析高光内容</p>
+            <p class="subtitle">自动获取主播近期直播中的高光时刻以及ai分析高光内容</p>
           </div>
 
           <!-- Streamers live cards -->
@@ -27,7 +27,7 @@
               :auto-refresh="true"
               :refresh-interval="30000"
             />
-            <AddStreamerCard @click="showAddModal = true" />
+            <AddStreamerCard @click="handleAddStreamerClick" />
           </div>
         </div>
     </main>
@@ -45,11 +45,12 @@
 <script>
 import { ref, onMounted, nextTick, onBeforeUnmount } from "vue";
 import { api } from "../api";
-import { getStreamers, getTwitchStatus, getAnalysis } from "../api/streamers";
+import { getStreamers, getTwitchStatus, getAnalysis, subscribeStreamer } from "../api/streamers";
 import StreamerCard from "../components/StreamerCard.vue";
 import VODList from "../components/VODList.vue";
 import AddStreamerCard from "../components/AddStreamerCard.vue";
 import AddStreamerModal from "../components/AddStreamerModal.vue";
+import { useAuth } from "../composables/useAuth";
 
 export default {
   components: {
@@ -59,53 +60,26 @@ export default {
     AddStreamerModal
   },
   setup() {
+    const { currentUser } = useAuth();
     const searchQuery = ref("");
     const loading = ref(false);
     const results = ref([]);
     const error = ref("");
     const showAddModal = ref(false);
 
-    // Streamers list - 从 localStorage 加载或使用默认值
-    const loadStreamers = () => {
-      try {
-        const saved = localStorage.getItem('subscribedStreamers');
-        if (saved) {
-          return JSON.parse(saved);
-        }
-      } catch (e) {
-        console.error('加载主播列表失败:', e);
-      }
-      // 默认主播列表
-      return [
-        {
-          id: 'kanekolumi',
-          name: 'kanekolumi',
-          avatarUrl: 'https://static-cdn.jtvnw.net/jtv_user_pictures/7ef8599e-5252-43b4-a4fa-baff1a73e78c-profile_image-70x70.png'
-        }
-      ];
-    };
-
-    const streamers = ref(loadStreamers());
+    // Streamers list - 从 API 获取
+    const streamers = ref([]);
 
     // per-vod analysis cache
     const analysisMap = ref({});
 
     const fetchStreamers = async () => {
-    
-  
-    };
-
-    const loadAnalysis = async (vod) => {
-      if (!vod || !vod.video_id) return;
-      const vid = vod.video_id;
-      if (analysisMap.value[vid]) return;
-      
       try {
-        const data = await getAnalysis(vid);
-        const series = (data && data.time_series_data) ? data.time_series_data : [];
-        analysisMap.value = { ...analysisMap.value, [vid]: series };
+        const data = await getStreamers();
+        streamers.value = data || [];
       } catch (e) {
-        console.error('loadAnalysis error', e);
+        console.error('获取主播列表失败:', e);
+        streamers.value = [];
       }
     };
 
@@ -129,33 +103,27 @@ export default {
       }
     };
 
-    const subscribe = () => alert("订阅功能开发中");
-
-    const handleAddStreamer = (streamerData) => {
-      // 检查是否已存在
-      const exists = streamers.value.some(s => s.id === streamerData.id);
-      if (exists) {
-        alert(`主播 "${streamerData.name}" 已在订阅列表中`);
+    const handleAddStreamerClick = () => {
+      if (!currentUser.value) {
+        alert('防止过度的添加，请先登录后使用');
         return;
       }
+      showAddModal.value = true;
+    };
 
-      // 添加到列表
-      streamers.value.push({
-        id: streamerData.id,
-        name: streamerData.name,
-        avatarUrl: streamerData.avatarUrl || 'https://via.placeholder.com/70',
-        platform: streamerData.platform
-      });
-
-      // 保存到 localStorage
+    const handleAddStreamer = async (streamerData) => {
       try {
-        localStorage.setItem('subscribedStreamers', JSON.stringify(streamers.value));
+        // 调用 API 添加主播
+        await subscribeStreamer(streamerData);
+        
+        // 重新获取主播列表
+        await fetchStreamers();
+        
+        showAddModal.value = false;
       } catch (e) {
-        console.error('保存主播列表失败:', e);
+        console.error('添加主播失败:', e);
+        alert(e.message || '添加主播失败，请稍后重试');
       }
-
-      showAddModal.value = false;
-      alert(`成功添加主播 "${streamerData.name}"！`);
     };
 
     return {
@@ -164,12 +132,12 @@ export default {
       results,
       error,
       handleSearch,
-      subscribe,
       streamers,
       analysisMap,
       getTwitchStatus,
       showAddModal,
       handleAddStreamer,
+      handleAddStreamerClick,
     };
   },
 };
