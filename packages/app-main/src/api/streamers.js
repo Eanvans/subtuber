@@ -27,6 +27,17 @@ export async function getTwitchStatus(streamerId) {
   return data || {};
 }
 
+export async function getStreamingStatus(streamerId) {
+  if (!streamerId) {
+    throw new Error('/api/streaming/status fetch failed, no streamer id');
+  }
+  
+  const res = await fetch(`/api/streaming/status/${encodeURIComponent(streamerId)}`);
+  if (!res.ok) throw new Error(`/api/streaming/status/${streamerId} fetch failed`);
+  const data = await res.json();
+  return data || {};
+}
+
 export async function getAnalysis(videoId, windowsLen, thr, searchRange) {
   if (!videoId) throw new Error('videoId required');
   

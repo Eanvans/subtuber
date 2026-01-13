@@ -22,8 +22,9 @@
               :key="streamer.id"
               :streamer-name="streamer.name"
               :streamer-id="streamer.id"
+              :streamer-platforms="streamer.platforms"
               :avatar-url="streamer.profile_image_url"
-              :check-status-fn="getTwitchStatus"
+              :check-status-fn="getStreamingStatus"
               :auto-refresh="true"
               :refresh-interval="30000"
             />
@@ -45,7 +46,7 @@
 <script>
 import { ref, onMounted, nextTick, onBeforeUnmount } from "vue";
 import { api } from "../api";
-import { getStreamers, getTwitchStatus, getAnalysis, subscribeStreamer } from "../api/streamers";
+import { getStreamers, getTwitchStatus, getStreamingStatus, getAnalysis, subscribeStreamer } from "../api/streamers";
 import StreamerCard from "../components/StreamerCard.vue";
 import VODList from "../components/VODList.vue";
 import AddStreamerCard from "../components/AddStreamerCard.vue";
@@ -135,6 +136,7 @@ export default {
       streamers,
       analysisMap,
       getTwitchStatus,
+      getStreamingStatus,
       showAddModal,
       handleAddStreamer,
       handleAddStreamerClick,
