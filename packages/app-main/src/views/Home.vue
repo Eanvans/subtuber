@@ -22,7 +22,34 @@
 
           <!-- 空状态 -->
           <div v-else-if="streamers.length === 0" class="empty-state">
-            <div class="empty-icon">📺</div>
+            <div class="empty-icon">
+              <svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <!-- 背景圆形 -->
+                <circle cx="60" cy="60" r="60" fill="url(#gradient1)"/>
+                <!-- 电视屏幕 -->
+                <rect x="25" y="30" width="70" height="50" rx="4" fill="white" opacity="0.9"/>
+                <!-- 屏幕内容（播放符号） -->
+                <path d="M50 45 L50 65 L70 55 Z" fill="url(#gradient2)"/>
+                <!-- 电视底座 -->
+                <rect x="50" y="82" width="20" height="3" rx="1.5" fill="white" opacity="0.8"/>
+                <rect x="45" y="85" width="30" height="2" rx="1" fill="white" opacity="0.6"/>
+                <!-- 装饰点 -->
+                <circle cx="85" cy="25" r="3" fill="white" opacity="0.5"/>
+                <circle cx="95" cy="35" r="2" fill="white" opacity="0.5"/>
+                <circle cx="25" cy="90" r="2.5" fill="white" opacity="0.5"/>
+                
+                <defs>
+                  <linearGradient id="gradient1" x1="0" y1="0" x2="120" y2="120">
+                    <stop offset="0%" stop-color="#667eea"/>
+                    <stop offset="100%" stop-color="#764ba2"/>
+                  </linearGradient>
+                  <linearGradient id="gradient2" x1="50" y1="45" x2="70" y2="65">
+                    <stop offset="0%" stop-color="#667eea"/>
+                    <stop offset="100%" stop-color="#764ba2"/>
+                  </linearGradient>
+                </defs>
+              </svg>
+            </div>
             <h3>还没有订阅任何主播</h3>
             <p>去主播广场发现并订阅你喜欢的主播吧！</p>
             <button @click="goToMarket" class="btn-primary">前往主播广场</button>
@@ -183,8 +210,19 @@ export default {
 }
 
 .empty-icon {
-  font-size: 4rem;
-  margin-bottom: 1rem;
+  width: 120px;
+  height: 120px;
+  margin: 0 auto 1.5rem;
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
 }
 
 .empty-state h3 {
