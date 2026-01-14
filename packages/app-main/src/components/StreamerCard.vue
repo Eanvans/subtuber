@@ -17,6 +17,17 @@
       <div class="streamer-header">
         <img v-if="avatarUrl" :src="avatarUrl" alt="avatar" class="avatar" />
         <h3 class="streamer-name">{{ streamerName }}</h3>
+        <button 
+          v-if="showSubscribeButton"
+          class="btn-subscribe-mini" 
+          :class="{ 'subscribed': isSubscribed }"
+          @click.prevent="toggleSubscription"
+          @mouseenter="isHovering = true"
+          @mouseleave="isHovering = false"
+          :disabled="subscriptionLoading"
+        >
+          {{ getButtonText }}
+        </button>
       </div>
 
       <p class="stream-title" v-if="streamTitle">
@@ -58,8 +69,9 @@
 </template>
 
 <script>
-import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { formatPlatformName, formatViewerCount } from '../utils/platform'
+import { checkSubscription, subscribe, unsubscribe } from '../api/streamers'
 
 export default {
   name: 'StreamerCard',
@@ -91,6 +103,10 @@ export default {
     refreshInterval: {
       type: Number,
       default: 30000
+    },
+    showSubscribeButton: {
+      type: Boolean,
+      default: false
     }
   },
   setup(props) {
@@ -102,6 +118,9 @@ export default {
     const liveUrl = ref('')
     const statusChecked = ref(false)
     const loadingStatus = ref(false)
+    const isSubscribed = ref(false)
+    const subscriptionLoading = ref(false)
+    const isHovering = ref(false)
 
     let intervalId = null
 
@@ -114,6 +133,40 @@ export default {
     const formatThumbnailUrl = (url, width = 440, height = 248) => {
       if (!url) return ""
       return url.replace("{width}", width).replace("{height}", height)
+    }
+
+    const getButtonText = computed(() => {
+      if (subscriptionLoading.value) return '...'
+      if (isSubscribed.value && isHovering.value) return '取消'
+      if (isSubscribed.value) return '✓'
+      return '+'
+    })
+
+    const checkSubscriptionStatus = async () => {
+      if (!props.showSubscribeButton) return
+      try {
+        isSubscribed.value = await checkSubscription(props.streamerId)
+      } catch (e) {
+        console.error('checkSubscription error', e)
+      }
+    }
+
+    const toggleSubscription = async () => {
+      try {
+        subscriptionLoading.value = true
+        if (isSubscribed.value) {
+          await unsubscribe(props.streamerId)
+          isSubscribed.value = false
+        } else {
+          await subscribe(props.streamerId)
+          isSubscribed.value = true
+        }
+      } catch (e) {
+        console.error('toggleSubscription error', e)
+        alert('订阅操作失败，请稍后重试')
+      } finally {
+        subscriptionLoading.value = false
+      }
     }
 
     const checkLive = async () => {
@@ -190,6 +243,7 @@ export default {
 
     onMounted(() => {
       checkLive()
+      checkSubscriptionStatus()
       if (props.autoRefresh) {
         intervalId = setInterval(checkLive, props.refreshInterval)
       }
@@ -218,7 +272,12 @@ export default {
       statusChecked,
       loadingStatus,
       pDisplay: formatPlatformName,
-      formatViewerCount
+      formatViewerCount,
+      isSubscribed,
+      subscriptionLoading,
+      isHovering,
+      toggleSubscription,
+      getButtonText
     }
   }
 }
@@ -337,6 +396,41 @@ export default {
   text-overflow: ellipsis;
   white-space: nowrap;
   flex: 1;
+}
+
+.btn-subscribe-mini {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1.5px solid #3b82f6;
+  background: #3b82f6;
+  color: white;
+  min-width: 32px;
+  flex-shrink: 0;
+}
+
+.btn-subscribe-mini:hover:not(:disabled) {
+  background: #2563eb;
+  border-color: #2563eb;
+}
+
+.btn-subscribe-mini.subscribed {
+  background: white;
+  color: #3b82f6;
+}
+
+.btn-subscribe-mini.subscribed:hover:not(:disabled) {
+  background: #fee2e2;
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+.btn-subscribe-mini:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .stream-title {

@@ -45,7 +45,7 @@
             <!-- 添加更多主播提示卡片 -->
             <AddStreamerCard 
               title="订阅更多的主播" 
-              description="去主播广场添加支持订阅的主播"
+              description="去主播广场浏览更多可以订阅的主播"
               @click="goToMarket" 
             />
           </div>

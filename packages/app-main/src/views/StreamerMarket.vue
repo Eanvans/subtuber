@@ -32,6 +32,7 @@
             :check-status-fn="getStreamingStatus"
             :auto-refresh="true"
             :refresh-interval="30000"
+            :show-subscribe-button="true"
           />
           <AddStreamerCard @click="handleAddStreamerClick" />
         </div>
