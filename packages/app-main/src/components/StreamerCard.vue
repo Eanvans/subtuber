@@ -1,17 +1,9 @@
 <template>
-  <router-link 
-    :to="{ name: 'streamer-detail', params: { streamer_id: streamerId } }" 
-    class="streamer-card" 
-    v-if="statusChecked"
-  >
+  <router-link :to="{ name: 'streamer-detail', params: { streamer_id: streamerId } }" class="streamer-card"
+    v-if="statusChecked">
     <!-- 缩略图区域 -->
     <div class="card-thumbnail">
-      <img
-        v-if="thumbnail"
-        :src="thumbnail"
-        alt="thumb"
-        class="thumb-image"
-      />
+      <img v-if="thumbnail" :src="thumbnail" alt="thumb" class="thumb-image" />
       <div v-else class="thumb-placeholder">
         <span>离线中</span>
       </div>
@@ -19,46 +11,56 @@
         {{ isLive ? "LIVE" : "OFFLINE" }}
       </span>
     </div>
-    
+
     <!-- 信息区域 -->
     <div class="card-info">
       <div class="streamer-header">
         <img v-if="avatarUrl" :src="avatarUrl" alt="avatar" class="avatar" />
         <h3 class="streamer-name">{{ streamerName }}</h3>
+        <button 
+          v-if="showSubscribeButton"
+          class="btn-subscribe-mini" 
+          :class="{ 'subscribed': isSubscribed }"
+          @click.prevent="toggleSubscription"
+          @mouseenter="isHovering = true"
+          @mouseleave="isHovering = false"
+          :disabled="subscriptionLoading"
+        >
+          {{ getButtonText }}
+        </button>
       </div>
-      
+
       <p class="stream-title" v-if="streamTitle">
         {{ streamTitle }}
       </p>
       <p class="stream-title offline-text" v-else>
         暂未开播
       </p>
-      
+
       <div class="card-footer">
         <div class="meta-info">
           <span v-if="viewerCount" class="viewer-count">
             <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
+              <path
+                d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" />
             </svg>
             {{ formatViewerCount(viewerCount) }}
           </span>
-          <span v-for="p in platforms" :key="p" class="platform-tag">
-            <svg v-if="pDisplay(p) === 'Twitch'" class="platform-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <span v-for="p in streamerPlatforms" :key="p" class="platform-tag">
+            <svg v-if="pDisplay(p.platform) === 'Twitch'" class="platform-icon" viewBox="0 0 24 24" aria-hidden="true">
               <rect x="2" y="3" width="16" height="14" rx="2" ry="2" fill="#6441A5" />
               <path d="M6 19v2h3v-2" fill="#6441A5" />
               <path d="M9 7h2v3H9zM13 7h2v3h-2z" fill="#fff" />
             </svg>
-            {{ pDisplay(p) }}
+            <svg v-else-if="pDisplay(p.platform) === 'YouTube'" class="platform-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" fill="#FF0000"/>
+            </svg>
+            {{ pDisplay(p.platform) }}
           </span>
         </div>
-        
-        <a
-          v-if="isLive && liveUrl"
-          :href="liveUrl"
-          target="_blank"
-          class="watch-btn"
-          @click.stop.prevent="openLiveStream"
-        >
+
+        <a v-if="isLive && liveUrl" :href="liveUrl" target="_blank" class="watch-btn"
+          @click.stop.prevent="openLiveStream">
           观看
         </a>
       </div>
@@ -67,8 +69,11 @@
 </template>
 
 <script>
-import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { formatPlatformName, formatViewerCount } from '../utils/platform'
+import { checkSubscription, subscribe, unsubscribe } from '../api/streamers'
+import { useAuth } from '../composables/useAuth'
+import { showNotification } from '../utils/notification'
 
 export default {
   name: 'StreamerCard',
@@ -80,6 +85,10 @@ export default {
     streamerId: {
       type: String,
       required: true
+    },
+    streamerPlatforms: {
+      type: Array,
+      default: () => []
     },
     avatarUrl: {
       type: String,
@@ -96,9 +105,14 @@ export default {
     refreshInterval: {
       type: Number,
       default: 30000
+    },
+    showSubscribeButton: {
+      type: Boolean,
+      default: false
     }
   },
   setup(props) {
+    const { currentUser } = useAuth()
     const isLive = ref(false)
     const platforms = ref([])
     const streamTitle = ref('')
@@ -107,6 +121,9 @@ export default {
     const liveUrl = ref('')
     const statusChecked = ref(false)
     const loadingStatus = ref(false)
+    const isSubscribed = ref(false)
+    const subscriptionLoading = ref(false)
+    const isHovering = ref(false)
 
     let intervalId = null
 
@@ -121,16 +138,113 @@ export default {
       return url.replace("{width}", width).replace("{height}", height)
     }
 
+    const getButtonText = computed(() => {
+      if (subscriptionLoading.value) return '...'
+      if (isSubscribed.value && isHovering.value) return '取消'
+      if (isSubscribed.value) return '✓'
+      return '+订阅'
+    })
+
+    const checkSubscriptionStatus = async () => {
+      if (!props.showSubscribeButton) return
+      // 如果没有登录，不调用检查订阅 API
+      if (!currentUser.value) return
+      
+      try {
+        isSubscribed.value = await checkSubscription(props.streamerId)
+      } catch (e) {
+        console.error('checkSubscription error', e)
+      }
+    }
+
+    const toggleSubscription = async () => {
+      // 检查是否登录
+      if (!currentUser.value) {
+        showNotification('请先登录后再进行订阅操作')
+        return
+      }
+      
+      try {
+        subscriptionLoading.value = true
+        if (isSubscribed.value) {
+          await unsubscribe(props.streamerId)
+          isSubscribed.value = false
+        } else {
+          await subscribe(props.streamerId)
+          isSubscribed.value = true
+        }
+      } catch (e) {
+        console.error('toggleSubscription error', e)
+        showNotification('订阅操作失败，请稍后重试')
+      } finally {
+        subscriptionLoading.value = false
+      }
+    }
+
     const checkLive = async () => {
       try {
         loadingStatus.value = true
         const data = await props.checkStatusFn(props.streamerId)
+        
+        // 使用顶层的 is_live 状态
         isLive.value = !!data.is_live
-        platforms.value = data.platforms || ["Twitch"]
-        streamTitle.value = data.stream_data?.title || ""
-        viewerCount.value = data.stream_data?.viewer_count || data.viewers || null
-        thumbnail.value = formatThumbnailUrl(data.stream_data?.thumbnail_url || "")
-        liveUrl.value = data.url || data.stream_url || `https://www.twitch.tv/${props.streamerId}`
+        
+        // 重置状态
+        platforms.value = []
+        streamTitle.value = ''
+        viewerCount.value = null
+        thumbnail.value = ''
+        liveUrl.value = ''
+        
+        // 检查 platforms 对象
+        if (data.platforms) {
+          let livePlatformData = null
+          let livePlatformName = ''
+          
+          // 遍历所有平台
+          for (const [platformName, platformData] of Object.entries(data.platforms)) {
+            if (platformData.is_live && platformData.stream) {
+              // 记录正在直播的平台
+              platforms.value.push(platformName)
+              
+              // 使用第一个直播的平台数据
+              if (!livePlatformData) {
+                livePlatformData = platformData.stream
+                livePlatformName = platformName
+              }
+            }
+          }
+          
+          // 如果有平台在直播，设置相关信息
+          if (livePlatformData && livePlatformData.stream_data) {
+            streamTitle.value = livePlatformData.stream_data.title || ""
+            viewerCount.value = livePlatformData.stream_data.viewer_count || null
+            
+            // 处理缩略图 URL
+            const thumbUrl = livePlatformData.stream_data.thumbnail_url || ""
+            if (thumbUrl.includes('{width}') && thumbUrl.includes('{height}')) {
+              // Twitch 格式的缩略图
+              thumbnail.value = formatThumbnailUrl(thumbUrl)
+            } else {
+              // YouTube 或其他平台的缩略图
+              thumbnail.value = thumbUrl
+            }
+            
+            // 根据平台设置直播链接
+            if (livePlatformName === 'youtube' && livePlatformData.stream_data.id) {
+              liveUrl.value = `https://www.youtube.com/watch?v=${livePlatformData.stream_data.id}`
+            } else if (livePlatformName === 'twitch') {
+              liveUrl.value = `https://www.twitch.tv/${props.streamerId}`
+            } else {
+              liveUrl.value = `https://www.twitch.tv/${props.streamerId}`
+            }
+          }
+          
+          // 如果没有平台在直播，记录所有平台
+          if (platforms.value.length === 0) {
+            platforms.value = Object.keys(data.platforms)
+          }
+        }
       } catch (e) {
         console.error(`checkLive error for ${props.streamerName}:`, e)
       } finally {
@@ -141,6 +255,7 @@ export default {
 
     onMounted(() => {
       checkLive()
+      checkSubscriptionStatus()
       if (props.autoRefresh) {
         intervalId = setInterval(checkLive, props.refreshInterval)
       }
@@ -169,7 +284,12 @@ export default {
       statusChecked,
       loadingStatus,
       pDisplay: formatPlatformName,
-      formatViewerCount
+      formatViewerCount,
+      isSubscribed,
+      subscriptionLoading,
+      isHovering,
+      toggleSubscription,
+      getButtonText
     }
   }
 }
@@ -245,9 +365,12 @@ export default {
 }
 
 @keyframes pulse {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 1;
   }
+
   50% {
     opacity: 0.8;
   }
@@ -285,6 +408,41 @@ export default {
   text-overflow: ellipsis;
   white-space: nowrap;
   flex: 1;
+}
+
+.btn-subscribe-mini {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1.5px solid #3b82f6;
+  background: #3b82f6;
+  color: white;
+  min-width: 32px;
+  flex-shrink: 0;
+}
+
+.btn-subscribe-mini:hover:not(:disabled) {
+  background: #2563eb;
+  border-color: #2563eb;
+}
+
+.btn-subscribe-mini.subscribed {
+  background: white;
+  color: #3b82f6;
+}
+
+.btn-subscribe-mini.subscribed:hover:not(:disabled) {
+  background: #fee2e2;
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+.btn-subscribe-mini:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .stream-title {
@@ -363,9 +521,10 @@ export default {
 
 .watch-btn:hover {
 
-.watch-btn:active {
-  transform: scale(0.95);
-}
+  .watch-btn:active {
+    transform: scale(0.95);
+  }
+
   background: #2563eb;
 }
 </style>

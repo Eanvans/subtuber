@@ -44,6 +44,7 @@
 
 <script>
 import { ref, computed } from 'vue'
+import { showNotification } from '../utils/notification'
 
 export default {
   name: 'AddStreamerModal',
@@ -106,7 +107,7 @@ export default {
       
       const parsed = parseStreamUrl(formData.value.streamUrl.trim())
       if (!parsed || !parsed.id) {
-        alert('无法解析直播间链接，请检查链接是否正确')
+        showNotification('无法解析直播间链接，请检查链接是否正确')
         return
       }
       

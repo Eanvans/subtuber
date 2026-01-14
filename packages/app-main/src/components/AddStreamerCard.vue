@@ -7,8 +7,8 @@
       </svg>
     </div>
     <div class="add-text">
-      <h3>添加主播</h3>
-      <p>订阅新的主播</p>
+      <h3>{{ title }}</h3>
+      <p>{{ description }}</p>
     </div>
   </div>
 </template>
@@ -16,6 +16,16 @@
 <script>
 export default {
   name: 'AddStreamerCard',
+  props: {
+    title: {
+      type: String,
+      default: '添加主播'
+    },
+    description: {
+      type: String,
+      default: '添加新的需要支持的主播'
+    }
+  },
   emits: ['click']
 }
 </script>

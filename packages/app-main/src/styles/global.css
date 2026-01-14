@@ -38,6 +38,7 @@ body{font-family: system-ui, 'Segoe UI', Roboto, Arial, sans-serif}
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 2rem;
 }
 
 .brand {
@@ -45,12 +46,29 @@ body{font-family: system-ui, 'Segoe UI', Roboto, Arial, sans-serif}
   color: var(--accent);
   font-size: 1.25rem;
   text-decoration: none;
+  flex-shrink: 0;
 }
 
 .nav-links {
   display: flex;
   gap: 2rem;
-  list-style: none;
+  flex: 1;
+}
+
+.nav-link {
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 0.2s;
+  font-weight: 500;
+}
+
+.nav-link:hover,
+.nav-link.router-link-active {
+  color: var(--accent);
+}
+
+.nav-actions {
+  flex-shrink: 0;
 }
 
 .nav-links a {
