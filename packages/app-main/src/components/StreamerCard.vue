@@ -139,7 +139,7 @@ export default {
       if (subscriptionLoading.value) return '...'
       if (isSubscribed.value && isHovering.value) return '取消'
       if (isSubscribed.value) return '✓'
-      return '+'
+      return '+订阅'
     })
 
     const checkSubscriptionStatus = async () => {
