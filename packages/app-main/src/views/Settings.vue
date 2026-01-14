@@ -84,9 +84,9 @@ export default {
       })
     }
     
-    const handleLogout = () => {
+    const handleLogout = async () => {
       if (confirm('确定要注销登录吗？')) {
-        logout()
+        await logout()
         router.push('/')
       }
     }

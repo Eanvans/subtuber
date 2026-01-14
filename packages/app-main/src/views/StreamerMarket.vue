@@ -55,6 +55,7 @@ import StreamerCard from "../components/StreamerCard.vue";
 import AddStreamerCard from "../components/AddStreamerCard.vue";
 import AddStreamerModal from "../components/AddStreamerModal.vue";
 import { useAuth } from "../composables/useAuth";
+import { showNotification } from "../utils/notification";
 
 export default {
   components: {
@@ -90,7 +91,7 @@ export default {
 
     const handleAddStreamerClick = () => {
       if (!currentUser.value) {
-        alert('请先登录后使用');
+        showNotification('请先登录后使用');
         return;
       }
       showAddModal.value = true;
@@ -107,7 +108,7 @@ export default {
         showAddModal.value = false;
       } catch (e) {
         console.error('添加主播失败:', e);
-        alert(e.message || '添加主播失败，请稍后重试');
+        showNotification(e.message || '添加主播失败，请稍后重试');
       }
     };
 

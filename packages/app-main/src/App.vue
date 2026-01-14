@@ -1,5 +1,13 @@
 <template>
   <div id="app">
+    <!-- 全局通知 Banner -->
+    <transition name="slide-down">
+      <div v-if="showNotification" class="notification-banner">
+        <span>{{ notificationMessage }}</span>
+        <button @click="showNotification = false" class="notification-close">×</button>
+      </div>
+    </transition>
+    
     <nav class="navbar">
       <div class="navbar-container">
         <router-link to="/" class="brand">SubTuber</router-link>
@@ -68,7 +76,8 @@
 </template>
 
 <script>
-import { ref } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { useRouter } from 'vue-router'
 import Login from '../../shared-auth/Login.vue'
 import { useAuth } from './composables/useAuth'
 
@@ -76,26 +85,107 @@ export default {
   name: 'App',
   components: { Login },
   setup() {
+    const router = useRouter()
     const showLogin = ref(false)
     const { currentUser, setUser } = useAuth()
     const currentYear = new Date().getFullYear()
+    const showNotification = ref(false)
+    const notificationMessage = ref('')
+
+    // 全局通知处理
+    const handleShowNotification = (event) => {
+      notificationMessage.value = event.detail.message
+      showNotification.value = true
+      setTimeout(() => {
+        showNotification.value = false
+      }, 3000)
+    }
+
+    onMounted(() => {
+      window.addEventListener('show-notification', handleShowNotification)
+    })
+
+    onBeforeUnmount(() => {
+      window.removeEventListener('show-notification', handleShowNotification)
+    })
 
     const onVerified = (res) => {
       showLogin.value = false
       const user = res && res.user ? res.user : null
       if (user) {
         setUser(user)
+        // 登录成功后跳转到首页
+        router.push('/')
       }
     }
     const onSent = () => {}
     const onLoginError = (e) => { console.error(e) }
 
-    return { showLogin, currentUser, currentYear, onVerified, onSent, onLoginError }
+    return { 
+      showLogin, 
+      currentUser, 
+      currentYear, 
+      onVerified, 
+      onSent, 
+      onLoginError,
+      showNotification,
+      notificationMessage
+    }
   }
 }
 </script>
 
 <style>
+.notification-banner {
+  position: fixed;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 1rem 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  gap: 1rem;
+  z-index: 1000;
+  min-width: 300px;
+  max-width: 500px;
+}
+
+.notification-close {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  opacity: 0.8;
+  transition: opacity 0.2s;
+}
+
+.notification-close:hover {
+  opacity: 1;
+}
+
+.slide-down-enter-active,
+.slide-down-leave-active {
+  transition: all 0.3s ease;
+}
+
+.slide-down-enter-from {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-20px);
+}
+
+.slide-down-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-20px);
+}
+
 .login-overlay {
   position: fixed;
   inset: 0;

@@ -1,5 +1,13 @@
 <template>
   <div class="streamer-detail-page">
+    <!-- 通知 Banner -->
+    <transition name="slide-down">
+      <div v-if="showNotification" class="notification-banner">
+        <span>{{ notificationMessage }}</span>
+        <button @click="showNotification = false" class="notification-close">×</button>
+      </div>
+    </transition>
+    
     <div class="main-content">
       <div class="card" style="max-width: 960px; margin: 0 auto">
         <button class="btn btn-ghost" @click="$router.back()">← 返回</button>
@@ -41,6 +49,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { getStreamerVODs, getAnalysis, checkSubscription, subscribe, unsubscribe } from '../api/streamers'
+import { useAuth } from '../composables/useAuth'
 import VODList from '../components/VODList.vue'
 
 export default {
@@ -50,6 +59,7 @@ export default {
   },
   setup() {
     const route = useRoute()
+    const { currentUser } = useAuth()
     const streamerId = route.params.streamer_id
     const loading = ref(true)
     const vods = ref([])
@@ -58,6 +68,17 @@ export default {
     const isSubscribed = ref(false)
     const subscriptionLoading = ref(false)
     const isHovering = ref(false)
+    const showNotification = ref(false)
+    const notificationMessage = ref('')
+
+    // 显示通知的辅助函数
+    const showNotificationWithMessage = (message) => {
+      notificationMessage.value = message
+      showNotification.value = true
+      setTimeout(() => {
+        showNotification.value = false
+      }, 3000)
+    }
 
     // 这里可以从 streamers 配置或 API 获取头像
     const streamerName = computed(() => {
@@ -90,6 +111,9 @@ export default {
     }
 
     const checkSubscriptionStatus = async () => {
+      // 如果没有登录，不调用检查订阅 API
+      if (!currentUser.value) return
+      
       try {
         isSubscribed.value = await checkSubscription(streamerId)
       } catch (e) {
@@ -98,6 +122,12 @@ export default {
     }
 
     const toggleSubscription = async () => {
+      // 检查是否登录
+      if (!currentUser.value) {
+        showNotificationWithMessage('请先登录后再进行订阅操作')
+        return
+      }
+      
       try {
         subscriptionLoading.value = true
         if (isSubscribed.value) {
@@ -109,7 +139,7 @@ export default {
         }
       } catch (e) {
         console.error('toggleSubscription error', e)
-        alert('订阅操作失败，请稍后重试')
+        showNotificationWithMessage('订阅操作失败，请稍后重试')
       } finally {
         subscriptionLoading.value = false
       }
@@ -160,13 +190,64 @@ export default {
       subscriptionLoading,
       isHovering,
       toggleSubscription,
-      getButtonText
+      getButtonText,
+      showNotification,
+      notificationMessage
     }
   }
 }
 </script>
 
 <style scoped>
+.notification-banner {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 1rem 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  z-index: 1000;
+  min-width: 300px;
+  max-width: 500px;
+}
+
+.notification-close {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  opacity: 0.8;
+  transition: opacity 0.2s;
+}
+
+.notification-close:hover {
+  opacity: 1;
+}
+
+.slide-down-enter-active,
+.slide-down-leave-active {
+  transition: all 0.3s ease;
+}
+
+.slide-down-enter-from {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-20px);
+}
+
+.slide-down-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-20px);
+}
+
 .streamer-detail-page {
   padding: 1rem;
   min-height: 100vh;

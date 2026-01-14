@@ -97,6 +97,7 @@ import StreamerCard from "../components/StreamerCard.vue";
 import AddStreamerCard from "../components/AddStreamerCard.vue";
 import AddStreamerModal from "../components/AddStreamerModal.vue";
 import { useAuth } from "../composables/useAuth";
+import { showNotification } from "../utils/notification";
 
 export default {
   components: {
@@ -115,6 +116,13 @@ export default {
 
     // 获取用户订阅的主播列表
     const fetchStreamers = async () => {
+      // 如果没有登录，不请求订阅列表
+      if (!currentUser.value) {
+        streamers.value = [];
+        loading.value = false;
+        return;
+      }
+      
       loading.value = true;
       try {
         const response = await fetch('/api/user/subscriptions');
@@ -146,7 +154,7 @@ export default {
 
     const handleAddStreamerClick = () => {
       if (!currentUser.value) {
-        alert('请先登录后使用');
+        showNotification('请先登录后使用');
         return;
       }
       showAddModal.value = true;
@@ -163,7 +171,7 @@ export default {
         showAddModal.value = false;
       } catch (e) {
         console.error('添加主播失败:', e);
-        alert(e.message || '添加主播失败，请稍后重试');
+        showNotification(e.message || '添加主播失败，请稍后重试');
       }
     };
 

@@ -111,6 +111,7 @@
 import { ref } from "vue";
 import { api } from "../api";
 import Login from "../../../shared-auth/Login.vue";
+import { showNotification } from "../utils/notification";
 
 export default {
   components: { Login },
@@ -157,7 +158,7 @@ export default {
       }
     };
 
-    const subscribe = () => alert("订阅功能开发中");
+    const subscribe = () => showNotification("订阅功能开发中");
 
     return {
       searchQuery,

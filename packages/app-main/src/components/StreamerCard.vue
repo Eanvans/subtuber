@@ -72,6 +72,8 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { formatPlatformName, formatViewerCount } from '../utils/platform'
 import { checkSubscription, subscribe, unsubscribe } from '../api/streamers'
+import { useAuth } from '../composables/useAuth'
+import { showNotification } from '../utils/notification'
 
 export default {
   name: 'StreamerCard',
@@ -110,6 +112,7 @@ export default {
     }
   },
   setup(props) {
+    const { currentUser } = useAuth()
     const isLive = ref(false)
     const platforms = ref([])
     const streamTitle = ref('')
@@ -144,6 +147,9 @@ export default {
 
     const checkSubscriptionStatus = async () => {
       if (!props.showSubscribeButton) return
+      // 如果没有登录，不调用检查订阅 API
+      if (!currentUser.value) return
+      
       try {
         isSubscribed.value = await checkSubscription(props.streamerId)
       } catch (e) {
@@ -152,6 +158,12 @@ export default {
     }
 
     const toggleSubscription = async () => {
+      // 检查是否登录
+      if (!currentUser.value) {
+        showNotification('请先登录后再进行订阅操作')
+        return
+      }
+      
       try {
         subscriptionLoading.value = true
         if (isSubscribed.value) {
@@ -163,7 +175,7 @@ export default {
         }
       } catch (e) {
         console.error('toggleSubscription error', e)
-        alert('订阅操作失败，请稍后重试')
+        showNotification('订阅操作失败，请稍后重试')
       } finally {
         subscriptionLoading.value = false
       }
