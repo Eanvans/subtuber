@@ -3,6 +3,10 @@
     <nav class="navbar">
       <div class="navbar-container">
         <router-link to="/" class="brand">SubTuber</router-link>
+        <div class="nav-links">
+          <router-link to="/" class="nav-link">我的订阅</router-link>
+          <router-link to="/market" class="nav-link">主播广场</router-link>
+        </div>
         <div class="nav-actions">
           <router-link v-if="currentUser" to="/settings" class="btn btn-ghost">
             <i class="bi bi-person-circle" aria-hidden="true"></i>

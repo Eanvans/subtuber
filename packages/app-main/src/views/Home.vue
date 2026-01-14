@@ -10,13 +10,26 @@
                 color: var(--muted);
               "
             >
-              订阅你喜欢的主播
+              我的订阅
             </h2>
-            <p class="subtitle">自动获取主播近期直播中的高光时刻以及ai分析高光内容</p>
+            <p class="subtitle">这里显示你订阅的主播，自动获取他们近期直播中的高光时刻</p>
           </div>
 
-          <!-- Streamers live cards -->
-          <div class="live-section">
+          <!-- 加载状态 -->
+          <div v-if="loading" class="loading-state">
+            <p>加载中...</p>
+          </div>
+
+          <!-- 空状态 -->
+          <div v-else-if="streamers.length === 0" class="empty-state">
+            <div class="empty-icon">📺</div>
+            <h3>还没有订阅任何主播</h3>
+            <p>去主播广场发现并订阅你喜欢的主播吧！</p>
+            <button @click="goToMarket" class="btn-primary">前往主播广场</button>
+          </div>
+
+          <!-- 主播列表 -->
+          <div v-else class="live-section">
             <StreamerCard
               v-for="streamer in streamers"
               :key="streamer.id"
@@ -28,7 +41,13 @@
               :auto-refresh="true"
               :refresh-interval="30000"
             />
-            <AddStreamerCard @click="handleAddStreamerClick" />
+            
+            <!-- 添加更多主播提示卡片 -->
+            <AddStreamerCard 
+              title="订阅更多的主播" 
+              description="去主播广场添加支持订阅的主播"
+              @click="goToMarket" 
+            />
           </div>
         </div>
     </main>
@@ -44,11 +63,10 @@
 </template>
 
 <script>
-import { ref, onMounted, nextTick, onBeforeUnmount } from "vue";
-import { api } from "../api";
-import { getStreamers, getTwitchStatus, getStreamingStatus, getAnalysis, subscribeStreamer } from "../api/streamers";
+import { ref, onMounted } from "vue";
+import { useRouter } from "vue-router";
+import { getTwitchStatus, getStreamingStatus, subscribeStreamer } from "../api/streamers";
 import StreamerCard from "../components/StreamerCard.vue";
-import VODList from "../components/VODList.vue";
 import AddStreamerCard from "../components/AddStreamerCard.vue";
 import AddStreamerModal from "../components/AddStreamerModal.vue";
 import { useAuth } from "../composables/useAuth";
@@ -56,31 +74,33 @@ import { useAuth } from "../composables/useAuth";
 export default {
   components: {
     StreamerCard,
-    VODList,
     AddStreamerCard,
     AddStreamerModal
   },
   setup() {
+    const router = useRouter();
     const { currentUser } = useAuth();
-    const searchQuery = ref("");
     const loading = ref(false);
-    const results = ref([]);
-    const error = ref("");
     const showAddModal = ref(false);
 
-    // Streamers list - 从 API 获取
+    // 用户订阅的主播列表
     const streamers = ref([]);
 
-    // per-vod analysis cache
-    const analysisMap = ref({});
-
+    // 获取用户订阅的主播列表
     const fetchStreamers = async () => {
+      loading.value = true;
       try {
-        const data = await getStreamers();
-        streamers.value = data || [];
+        const response = await fetch('/api/user/subscriptions');
+        if (!response.ok) {
+          throw new Error('获取订阅列表失败');
+        }
+        const data = await response.json();
+        streamers.value = data?.streamers || [];
       } catch (e) {
-        console.error('获取主播列表失败:', e);
+        console.error('获取订阅主播列表失败:', e);
         streamers.value = [];
+      } finally {
+        loading.value = false;
       }
     };
 
@@ -88,25 +108,18 @@ export default {
       fetchStreamers();
     });
 
-    onBeforeUnmount(() => {
-    });
+    // 前往主播广场
+    const goToMarket = () => {
+      router.push('/market');
+    };
 
     const handleSearch = async () => {
-      if (!searchQuery.value.trim()) return;
-      loading.value = true;
-      try {
-        const data = await api.searchTwitch(searchQuery.value);
-        results.value = data;
-      } catch (e) {
-        error.value = "搜索失败";
-      } finally {
-        loading.value = false;
-      }
+      // 搜索功能已移除
     };
 
     const handleAddStreamerClick = () => {
       if (!currentUser.value) {
-        alert('防止过度的添加，请先登录后使用');
+        alert('请先登录后使用');
         return;
       }
       showAddModal.value = true;
@@ -128,18 +141,14 @@ export default {
     };
 
     return {
-      searchQuery,
       loading,
-      results,
-      error,
-      handleSearch,
       streamers,
-      analysisMap,
       getTwitchStatus,
       getStreamingStatus,
       showAddModal,
       handleAddStreamer,
       handleAddStreamerClick,
+      goToMarket,
     };
   },
 };
@@ -159,6 +168,49 @@ export default {
 
 .card {
   padding-bottom: 1rem;
+}
+
+.loading-state {
+  text-align: center;
+  padding: 2rem;
+  color: var(--muted);
+}
+
+.empty-state {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--muted);
+}
+
+.empty-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+}
+
+.empty-state h3 {
+  font-size: 1.25rem;
+  margin-bottom: 0.5rem;
+  color: var(--text-primary);
+}
+
+.empty-state p {
+  margin-bottom: 1.5rem;
+  color: var(--muted);
+}
+
+.btn-primary {
+  padding: 0.75rem 1.5rem;
+  background: var(--primary, #6366f1);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-primary:hover {
+  background: var(--primary-hover, #4f46e5);
 }
 
 .result-item {
