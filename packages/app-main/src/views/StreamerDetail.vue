@@ -10,6 +10,16 @@
             <h2>{{ streamerName }}</h2>
             <p class="streamer-id">ID: {{ streamerId }}</p>
           </div>
+          <button 
+            class="btn-subscribe" 
+            :class="{ 'subscribed': isSubscribed }"
+            @click="toggleSubscription"
+            @mouseenter="isHovering = true"
+            @mouseleave="isHovering = false"
+            :disabled="subscriptionLoading"
+          >
+            {{ getButtonText }}
+          </button>
         </div>
 
         <VODList
@@ -30,7 +40,7 @@
 <script>
 import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { getStreamerVODs, getAnalysis } from '../api/streamers'
+import { getStreamerVODs, getAnalysis, checkSubscription, subscribe, unsubscribe } from '../api/streamers'
 import VODList from '../components/VODList.vue'
 
 export default {
@@ -45,6 +55,9 @@ export default {
     const vods = ref([])
     const analysisMap = ref({})
     const streamerInfo = ref(null)
+    const isSubscribed = ref(false)
+    const subscriptionLoading = ref(false)
+    const isHovering = ref(false)
 
     // 这里可以从 streamers 配置或 API 获取头像
     const streamerName = computed(() => {
@@ -53,6 +66,13 @@ export default {
 
     const avatarUrl = computed(() => {
       return streamerInfo.value?.profile_image_url || streamerInfo.value?.avatar_url || ''
+    })
+
+    const getButtonText = computed(() => {
+      if (subscriptionLoading.value) return '处理中...'
+      if (isSubscribed.value && isHovering.value) return '取消订阅'
+      if (isSubscribed.value) return '已订阅'
+      return '订阅'
     })
 
     const loadAnalysis = async (vod) => {
@@ -66,6 +86,32 @@ export default {
         analysisMap.value = { ...analysisMap.value, [vid]: series }
       } catch (e) {
         console.error('loadAnalysis error', e)
+      }
+    }
+
+    const checkSubscriptionStatus = async () => {
+      try {
+        isSubscribed.value = await checkSubscription(streamerId)
+      } catch (e) {
+        console.error('checkSubscription error', e)
+      }
+    }
+
+    const toggleSubscription = async () => {
+      try {
+        subscriptionLoading.value = true
+        if (isSubscribed.value) {
+          await unsubscribe(streamerId)
+          isSubscribed.value = false
+        } else {
+          await subscribe(streamerId)
+          isSubscribed.value = true
+        }
+      } catch (e) {
+        console.error('toggleSubscription error', e)
+        alert('订阅操作失败，请稍后重试')
+      } finally {
+        subscriptionLoading.value = false
       }
     }
 
@@ -100,6 +146,7 @@ export default {
 
     onMounted(() => {
       fetchStreamerVODs()
+      checkSubscriptionStatus()
     })
 
     return {
@@ -108,7 +155,12 @@ export default {
       avatarUrl,
       loading,
       vods,
-      analysisMap
+      analysisMap,
+      isSubscribed,
+      subscriptionLoading,
+      isHovering,
+      toggleSubscription,
+      getButtonText
     }
   }
 }
@@ -149,6 +201,10 @@ export default {
   border: 3px solid #f3f4f6;
 }
 
+.streamer-info {
+  flex: 1;
+}
+
 .streamer-info h2 {
   margin: 0;
   font-size: 1.75rem;
@@ -159,6 +215,39 @@ export default {
   margin: 0.25rem 0 0;
   font-size: 0.9rem;
   color: #6b7280;
+}
+
+.btn-subscribe {
+  padding: 0.5rem 1.5rem;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 2px solid #3b82f6;
+  background: #3b82f6;
+  color: white;
+}
+
+.btn-subscribe:hover:not(:disabled) {
+  background: #2563eb;
+  border-color: #2563eb;
+}
+
+.btn-subscribe.subscribed {
+  background: white;
+  color: #3b82f6;
+}
+
+.btn-subscribe.subscribed:hover:not(:disabled) {
+  background: #fee2e2;
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+.btn-subscribe:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .loading-state,

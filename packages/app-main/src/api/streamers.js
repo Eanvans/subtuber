@@ -83,3 +83,34 @@ export async function subscribeStreamer(streamerData) {
   
   return await res.json();
 }
+
+// 订阅管理相关 API
+export async function checkSubscription(streamerId) {
+  if (!streamerId) throw new Error('streamerId required');
+  const res = await fetch(`/api/user/subscriptions/check?streamer_id=${encodeURIComponent(streamerId)}`);
+  if (!res.ok) throw new Error('Check subscription failed');
+  const data = await res.json();
+  return data.subscribed || false;
+}
+
+export async function subscribe(streamerId) {
+  if (!streamerId) throw new Error('streamerId required');
+  const res = await fetch('/api/user/subscriptions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ streamer_id: streamerId })
+  });
+  if (!res.ok) throw new Error('Subscribe failed');
+  return res.json();
+}
+
+export async function unsubscribe(streamerId) {
+  if (!streamerId) throw new Error('streamerId required');
+  const res = await fetch(`/api/user/subscriptions`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ streamer_id: streamerId })
+  });
+  if (!res.ok) throw new Error('Unsubscribe failed');
+  return res.json();
+}
