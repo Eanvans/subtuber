@@ -5,7 +5,7 @@
       <router-link
         v-for="v in vods"
         :key="v.id"
-        :to="{ name: 'recording', params: { video_id: v.video_id } }"
+        :to="{ name: 'recording', params: { video_id: v.video_id }, query: { platform: v.platform } }"
         class="recording-card"
       >
         <div class="rec-info">

@@ -136,6 +136,7 @@ export default {
     const route = useRoute()
     const router = useRouter()
     const videoId = route.params.video_id
+    const platform = ref(route.query.platform || '')
     const loading = ref(true)
     const error = ref('')
     const analysis = ref({})
@@ -288,11 +289,18 @@ export default {
           hotMoments.value.forEach(async (moment, idx) => {
             const offset = moment.offset_seconds ?? moment.offset ?? 0;
             // 为每个moment添加加载状态
-            moment.summaryLoading = true;
+            moment.summaryLoading = false;
             moment.summaryError = null;
             moment.summary = null;
             moment.expanded = false;
             
+            // 检查是否为YouTube平台
+            if (platform.value && platform.value.toLowerCase().includes('youtube')) {
+              moment.summary = 'YouTube总结因为Youtube的下载不稳定，暂时没有很好的解决方案，欢迎大佬加群交流和讨论。';
+              return;
+            }
+            
+            moment.summaryLoading = true;
             try {
               const summary = await getAnalysisSummary(videoId, offset);
               moment.summary = summary;
@@ -350,6 +358,7 @@ export default {
 
     return {
       videoId,
+      platform,
       loading,
       error,
       analysis,
