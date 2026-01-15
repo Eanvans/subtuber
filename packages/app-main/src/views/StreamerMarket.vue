@@ -34,17 +34,9 @@
             :refresh-interval="30000"
             :show-subscribe-button="true"
           />
-          <AddStreamerCard @click="handleAddStreamerClick" />
         </div>
       </div>
     </main>
-
-    <!-- 添加主播弹窗 -->
-    <AddStreamerModal
-      v-if="showAddModal"
-      @close="showAddModal = false"
-      @submit="handleAddStreamer"
-    />
   </div>
 </template>
 
@@ -52,16 +44,12 @@
 import { ref, onMounted } from "vue";
 import { getStreamers, getStreamingStatus, subscribeStreamer } from "../api/streamers";
 import StreamerCard from "../components/StreamerCard.vue";
-import AddStreamerCard from "../components/AddStreamerCard.vue";
-import AddStreamerModal from "../components/AddStreamerModal.vue";
 import { useAuth } from "../composables/useAuth";
 import { showNotification } from "../utils/notification";
 
 export default {
   components: {
     StreamerCard,
-    AddStreamerCard,
-    AddStreamerModal
   },
   setup() {
     const { currentUser } = useAuth();

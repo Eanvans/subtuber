@@ -51,8 +51,8 @@
               </svg>
             </div>
             <h3>还没有订阅任何主播</h3>
-            <p>去主播广场发现并订阅你喜欢的主播吧！</p>
-            <button @click="goToMarket" class="btn-primary">前往主播广场</button>
+            <p>快来添加你的第一个订阅的主播吧！</p>
+            <button @click="showStartExploreModal = true" class="btn-primary">点击这里开始你的探索</button>
           </div>
 
           <!-- 主播列表 -->
@@ -72,8 +72,8 @@
             <!-- 添加更多主播提示卡片 -->
             <AddStreamerCard 
               title="订阅更多的主播" 
-              description="去主播广场浏览更多可以订阅的主播"
-              @click="goToMarket" 
+              description=""
+              @click="showStartExploreModal = true" 
             />
           </div>
         </div>
@@ -85,17 +85,26 @@
       @close="showAddModal = false"
       @submit="handleAddStreamer"
     />
+
+    <!-- 开始探索弹窗 -->
+    <StartExploreModal
+      v-if="showStartExploreModal"
+      @close="showStartExploreModal = false"
+      @go-to-market="goToMarket"
+      @add-streamer="handleAddStreamer"
+    />
   </div>
   
 </template>
 
 <script>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, onBeforeUnmount } from "vue";
 import { useRouter } from "vue-router";
 import { getTwitchStatus, getStreamingStatus, subscribeStreamer } from "../api/streamers";
 import StreamerCard from "../components/StreamerCard.vue";
 import AddStreamerCard from "../components/AddStreamerCard.vue";
 import AddStreamerModal from "../components/AddStreamerModal.vue";
+import StartExploreModal from "../components/StartExploreModal.vue";
 import { useAuth } from "../composables/useAuth";
 import { showNotification } from "../utils/notification";
 
@@ -103,13 +112,15 @@ export default {
   components: {
     StreamerCard,
     AddStreamerCard,
-    AddStreamerModal
+    AddStreamerModal,
+    StartExploreModal
   },
   setup() {
     const router = useRouter();
     const { currentUser } = useAuth();
     const loading = ref(false);
     const showAddModal = ref(false);
+    const showStartExploreModal = ref(false);
 
     // 用户订阅的主播列表
     const streamers = ref([]);
@@ -139,8 +150,18 @@ export default {
       }
     };
 
+    // 登录成功后刷新列表
+    const handleLoginSuccess = () => {
+      fetchStreamers();
+    };
+
     onMounted(() => {
       fetchStreamers();
+      window.addEventListener('login-success', handleLoginSuccess);
+    });
+
+    onBeforeUnmount(() => {
+      window.removeEventListener('login-success', handleLoginSuccess);
     });
 
     // 前往主播广场
@@ -181,6 +202,7 @@ export default {
       getTwitchStatus,
       getStreamingStatus,
       showAddModal,
+      showStartExploreModal,
       handleAddStreamer,
       handleAddStreamerClick,
       goToMarket,

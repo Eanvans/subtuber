@@ -114,6 +114,8 @@ export default {
       const user = res && res.user ? res.user : null
       if (user) {
         setUser(user)
+        // 发送登录成功事件
+        window.dispatchEvent(new CustomEvent('login-success', { detail: { user } }))
         // 登录成功后跳转到首页
         router.push('/')
       }
