@@ -32,11 +32,11 @@
         <div class="footer-main">
           <div class="footer-section platform-section">
             <div class="footer-text">
-              <span class="platform-badge supported">Twitch</span> 已支持
+              <span class="platform-badge supported">Twitch</span> 
+              <span class="platform-badge supported">YouTube</span> 已支持
               <span class="separator">·</span>
-              <span class="platform-badge developing">YouTube</span> 
               <span class="platform-badge developing">Bilibili</span> 
-              开发中
+              暂时无计划，可以进群交流
             </div>
           </div>
 

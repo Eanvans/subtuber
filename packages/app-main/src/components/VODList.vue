@@ -20,6 +20,10 @@
                 <path d="M6 19v2h3v-2" fill="#6441A5" />
                 <path d="M9 7h2v3H9zM13 7h2v3h-2z" fill="#fff" />
               </svg>
+              <svg v-else-if="pDisplay(v.platform) === 'YouTube'" class="platform-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="2" y="4" width="20" height="16" rx="3" ry="3" fill="#FF0000" />
+                <path d="M10 8.5l6 3.5-6 3.5z" fill="#fff" />
+              </svg>
               {{ pDisplay(v.platform) }}
             </span>
             <span>·</span>

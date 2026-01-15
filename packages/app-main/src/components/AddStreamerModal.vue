@@ -14,15 +14,15 @@
       <div class="modal-body">
         <div class="form-group">
           <label for="stream-url">直播间链接 *</label>
-          <input
+          <textarea
             id="stream-url"
             v-model="formData.streamUrl"
-            type="url"
-            placeholder="例如: https://www.twitch.tv/kanekolumi"
+            rows="2"
+            placeholder="https://www.twitch.tv/username 或 &#10;https://www.youtube.com/@username"
             class="form-input"
             @keyup.enter="handleSubmit"
-          />
-          <span class="input-hint">输入主播的完整直播间链接，目前支持 Twitch 平台</span>
+          ></textarea>
+          <span class="input-hint">输入主播的完整直播间链接，目前支持 Twitch、YouTube 平台</span>
         </div>
       </div>
       
@@ -59,7 +59,7 @@ export default {
       if (!url) return false
       
       // 简单验证是否包含常见的直播平台域名
-      const validPlatforms = ['twitch.tv', 'youtube.com', 'youtu.be', 'bilibili.com']
+      const validPlatforms = ['twitch.tv', 'youtube.com']
       return validPlatforms.some(platform => url.includes(platform))
     })
 
@@ -87,12 +87,6 @@ export default {
             id = pathParts[pathParts.length - 1] || ''
             name = id
           }
-        } else if (urlObj.hostname.includes('bilibili.com')) {
-          platform = 'bilibili'
-          // https://live.bilibili.com/12345
-          const pathParts = urlObj.pathname.split('/').filter(Boolean)
-          id = pathParts[pathParts.length - 1] || ''
-          name = id
         }
 
         return { platform, id, name }
@@ -108,6 +102,11 @@ export default {
       const parsed = parseStreamUrl(formData.value.streamUrl.trim())
       if (!parsed || !parsed.id) {
         showNotification('无法解析直播间链接，请检查链接是否正确')
+        return
+      }
+      
+      if (parsed.platform === 'other' || (parsed.platform !== 'twitch' && parsed.platform !== 'youtube')) {
+        showNotification('暂时不支持该平台，目前仅支持 Twitch 和 YouTube')
         return
       }
       
@@ -231,13 +230,18 @@ export default {
 }
 
 .form-input {
-  padding: 0.625rem 0.875rem;
+  padding: 0.875rem;
   border: 1px solid #d1d5db;
   border-radius: 8px;
   font-size: 0.9375rem;
+  line-height: 1.5;
+  min-height: 3.5rem;
   color: #1f2937;
   transition: all 0.2s ease;
   background: var(--card, #fff);
+  vertical-align: top;
+  font-family: inherit;
+  resize: none;
 }
 
 .form-input:focus {
