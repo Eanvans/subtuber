@@ -57,9 +57,9 @@
             <p class="footer-links">
               <a href="https://github.com/Eanvans/subtuber" target="_blank" rel="noopener">GitHub</a>
               <span class="separator">·</span>
-              <a href="#" @click.prevent>隐私</a>
+              <router-link to="/privacy">隐私</router-link>
               <span class="separator">·</span>
-              <a href="#" @click.prevent>条款</a>
+              <router-link to="/terms">条款</router-link>
             </p>
           </div>
         </div>
