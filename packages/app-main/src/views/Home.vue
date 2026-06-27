@@ -90,7 +90,6 @@
     <StartExploreModal
       v-if="showStartExploreModal"
       @close="showStartExploreModal = false"
-      @go-to-market="goToMarket"
       @add-streamer="handleAddStreamer"
     />
   </div>
@@ -164,11 +163,6 @@ export default {
       window.removeEventListener('login-success', handleLoginSuccess);
     });
 
-    // 前往主播广场
-    const goToMarket = () => {
-      router.push('/market');
-    };
-
     const handleSearch = async () => {
       // 搜索功能已移除
     };
@@ -205,7 +199,6 @@ export default {
       showStartExploreModal,
       handleAddStreamer,
       handleAddStreamerClick,
-      goToMarket,
     };
   },
 };

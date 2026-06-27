@@ -3,7 +3,7 @@ import { getToken } from 'shared-auth'
 
 const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
-  timeout: 10000,
+  timeout: 600000, // 10分钟
   headers: {
     'Content-Type': 'application/json'
   }
@@ -49,6 +49,16 @@ export const api = {
     return apiClient.get('/search/twitch', {
       params: { q: query }
     })
+  },
+  // AI 相关接口
+  generateAIContent(data) {
+    return apiClient.post('/ai/generate', data)
+  },
+  getAIProviderInfo() {
+    return apiClient.get('/ai/provider')
+  },
+  summarizeSRT(data) {
+    return apiClient.post('/ai/summarize-srt', data)
   }
 }
 

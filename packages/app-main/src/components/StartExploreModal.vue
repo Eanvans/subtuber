@@ -12,8 +12,6 @@
       </div>
       
       <div class="modal-body">
-        <p class="subtitle">选择一种方式开始订阅你喜欢的主播</p>
-        
         <div class="options-container">
           <!-- 选项一：添加主播 -->
           <div class="option-card" @click="handleAddStreamer">
@@ -27,27 +25,6 @@
             <div class="option-content">
               <h4>直接添加主播</h4>
               <p>输入主播的直播间链接，快速添加订阅</p>
-            </div>
-            <div class="option-arrow">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="9 18 15 12 9 6"></polyline>
-              </svg>
-            </div>
-          </div>
-
-          <!-- 选项二：前往广场 -->
-          <div class="option-card" @click="handleGoToMarket">
-            <div class="option-icon option-icon-secondary">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                <circle cx="9" cy="7" r="4"></circle>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-              </svg>
-            </div>
-            <div class="option-content">
-              <h4>前往主播广场</h4>
-              <p>浏览其他用户订阅的热门主播</p>
             </div>
             <div class="option-arrow">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -77,17 +54,12 @@ export default {
   components: {
     AddStreamerModal
   },
-  emits: ['close', 'goToMarket', 'addStreamer'],
+  emits: ['close', 'addStreamer'],
   setup(props, { emit }) {
     const showAddStreamerModal = ref(false)
 
     const handleAddStreamer = () => {
       showAddStreamerModal.value = true
-    }
-
-    const handleGoToMarket = () => {
-      emit('goToMarket')
-      emit('close')
     }
 
     const handleSubmitStreamer = (streamerData) => {
@@ -99,7 +71,6 @@ export default {
     return {
       showAddStreamerModal,
       handleAddStreamer,
-      handleGoToMarket,
       handleSubmitStreamer
     }
   }
