@@ -128,6 +128,7 @@
 import { ref, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getAnalysis, getAnalysisSummary } from '../api/streamers'
+import { useAuth } from '../composables/useAuth'
 import Chart from 'chart.js/auto'
 
 export default {
@@ -135,6 +136,7 @@ export default {
     let chartInstance = null
     const route = useRoute()
     const router = useRouter()
+    const { currentUser } = useAuth()
     const videoId = route.params.video_id
     const platform = ref(route.query.platform || '')
     const loading = ref(true)
@@ -302,7 +304,11 @@ export default {
             
             moment.summaryLoading = true;
             try {
-              const summary = await getAnalysisSummary(videoId, offset);
+              // 获取 user_hash
+              const userHash = currentUser.value ? 
+                (currentUser.value.userId || currentUser.value.user_id || currentUser.value.userHash || currentUser.value.user_hash || currentUser.value.hash || currentUser.value.id || null) 
+                : null;
+              const summary = await getAnalysisSummary(videoId, offset, userHash);
               moment.summary = summary;
             } catch (err) {
               console.error(`加载摘要失败 (offset: ${offset})`, err);

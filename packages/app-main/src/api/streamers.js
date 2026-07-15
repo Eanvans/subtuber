@@ -55,10 +55,11 @@ export async function getAnalysis(videoId, windowsLen, thr, searchRange) {
   return data || null;
 }
 
-export async function getAnalysisSummary(videoId, offsetSeconds) {
+export async function getAnalysisSummary(videoId, offsetSeconds, userHash) {
   const params = new URLSearchParams();
   if (videoId) params.append('video_id', videoId);
   if (offsetSeconds !== undefined) params.append('offset_seconds', String(offsetSeconds));
+  if (userHash) params.append('user_hash', userHash);
   
   const url = `/api/twitch/analysis-summary?${params.toString()}`;
   const res = await fetch(url);
