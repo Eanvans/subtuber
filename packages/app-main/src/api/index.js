@@ -59,6 +59,32 @@ export const api = {
   },
   summarizeSRT(data) {
     return apiClient.post('/ai/summarize-srt', data)
+  },
+  
+  // API Key 管理接口
+  createApiKey(data) {
+    return apiClient.post('/apikeys', data)
+  },
+  getUserApiKeys(userHash) {
+    return apiClient.get(`/apikeys/user/${userHash}`)
+  },
+  getApiKeysByProvider(userHash, provider) {
+    return apiClient.get(`/apikeys/user/${userHash}/provider/${provider}`)
+  },
+  getApiKeyById(id) {
+    return apiClient.get(`/apikeys/${id}`)
+  },
+  updateApiKey(id, data) {
+    return apiClient.put(`/apikeys/${id}`, data)
+  },
+  deleteApiKey(id) {
+    return apiClient.delete(`/apikeys/${id}`)
+  },
+  deleteAllUserApiKeys(userHash) {
+    return apiClient.delete(`/apikeys/user/${userHash}`)
+  },
+  getUserProfileWithKeys(userHash) {
+    return apiClient.get(`/user/${userHash}/profile`)
   }
 }
 
