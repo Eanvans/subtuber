@@ -11,107 +11,48 @@
         @add-click="openStartExploreModal"
       />
 
-      <section class="content-panel">
-        <h2 class="page-title">直播热点时段</h2>
-
+      <section ref="contentPanelRef" class="content-panel" @scroll="handleContentScroll">
         <div v-if="loading" class="status-block">加载中…</div>
         <div v-else-if="error" class="status-block error">{{ error }}</div>
         <div v-else>
           <div class="meta-row">
-            <div><strong>VOD ID:</strong> {{ analysis.video_id || videoId }}</div>
+            <div>
+              <strong>VOD ID:</strong>
+              <a
+                v-if="vodExternalUrl"
+                :href="vodExternalUrl"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="vod-link"
+              >
+                {{ analysis.video_id || videoId }}
+              </a>
+              <span v-else>{{ analysis.video_id || videoId }}</span>
+            </div>
             <div><strong>主播:</strong> {{ analysis.streamer_name || '-' }}</div>
           </div>
 
-          <section class="time-series-chart">
-            <h3>直播热度趋势</h3>
+          <section class="time-series-chart" :style="timeSeriesChartStyle">
+            <div class="chart-header">
+              <h3>直播热度趋势</h3>
+              <button class="btn-advanced" @click="showAdvanced = true">高级参数调节</button>
+            </div>
             <div class="chart-container">
               <canvas id="timeSeriesChart" style="width:100%; height:100%"></canvas>
             </div>
           </section>
-
-          <section class="advanced-params">
-            <div class="advanced-toggle" @click="showAdvanced = !showAdvanced">
-              <span class="toggle-icon">{{ showAdvanced ? '▼' : '▶' }}</span>
-              <span class="toggle-text">高级参数调节</span>
-              <span class="toggle-hint">(调整分析算法参数)</span>
-            </div>
-
-            <transition name="slide-fade">
-              <div v-show="showAdvanced" class="advanced-content">
-                <div class="params-grid">
-                  <div class="param-item">
-                    <label>
-                      <span class="param-label">窗口长度 (s)</span>
-                      <span class="param-value">{{ analysisParams.windows_len }}</span>
-                    </label>
-                    <input
-                      v-model.number="analysisParams.windows_len"
-                      type="range"
-                      min="60"
-                      max="600"
-                      step="10"
-                    />
-                    <div class="param-hint">范围: 60-600秒, 控制分析窗口大小</div>
-                  </div>
-
-                  <div class="param-item">
-                    <label>
-                      <span class="param-label">阈值</span>
-                      <span class="param-value">{{ analysisParams.thr.toFixed(2) }}</span>
-                    </label>
-                    <input
-                      v-model.number="analysisParams.thr"
-                      type="range"
-                      min="0.5"
-                      max="1.0"
-                      step="0.01"
-                    />
-                    <div class="param-hint">范围: 0.50-1.00, 热点检测敏感度阈值</div>
-                  </div>
-
-                  <div class="param-item">
-                    <label>
-                      <span class="param-label">搜索范围 (s)</span>
-                      <span class="param-value">{{ analysisParams.search_range }}</span>
-                    </label>
-                    <input
-                      v-model.number="analysisParams.search_range"
-                      type="range"
-                      min="30"
-                      max="300"
-                      step="5"
-                    />
-                    <div class="param-hint">范围: 30-300秒, 峰值搜索范围</div>
-                  </div>
-                </div>
-                <div class="advanced-actions">
-                  <button class="btn btn-primary" @click="refreshAnalysis" :disabled="refreshing">
-                    {{ refreshing ? '更新中...' : '应用参数并刷新' }}
-                  </button>
-                </div>
-              </div>
-            </transition>
-          </section>
-
-          <div class="ai-params-notice">
-            <div class="notice-icon">ℹ️</div>
-            <div class="notice-content">
-              <div class="notice-title">AI 分析参数说明</div>
-              <div class="notice-text">
-                当前使用默认参数: 窗口长度 420秒 (7分钟) | 阈值 0.9 (90百分位) | 搜索范围 210秒 (3.5分钟)
-              </div>
-              <div class="notice-dev">⚠️ 实时更新 AI 总结功能还在开发中</div>
-            </div>
-          </div>
 
           <section class="hot-moments">
             <div v-if="!hotMoments.length">没有可展示的片段。</div>
             <div class="moments-list">
               <div v-for="(m, idx) in hotMoments" :key="idx" class="moment">
                 <div class="moment-left">
-                  <div class="time">{{ intervalRange(m) }}</div>
-                  <div class="interval">{{ m.time_interval || '' }}</div>
-                  <div><strong>热点得分:</strong> {{ m.comments_score }}</div>
+                  <div class="time">
+                    <span v-if="markerAssignmentReady && m.markerNo != null" class="moment-index">{{ m.markerNo }}.</span>
+                    {{ intervalRange(m) }}
+                  </div>
+                  <!-- <div class="interval">{{ m.time_interval || '' }}</div> -->
+                  <div><strong>得分:</strong> {{ m.comments_score }}</div>
                 </div>
                 <div class="moment-right">
                   <div
@@ -131,6 +72,70 @@
         </div>
       </section>
     </div>
+
+    <transition name="slide-fade">
+      <div v-if="showAdvanced" class="advanced-modal-overlay" @click.self="showAdvanced = false">
+        <div class="advanced-modal-card">
+          <div class="advanced-modal-header">
+            <h4>高级参数调节</h4>
+            <button class="modal-close" @click="showAdvanced = false">×</button>
+          </div>
+          <div class="advanced-modal-body">
+            <div class="params-grid">
+              <div class="param-item">
+                <label>
+                  <span class="param-label">窗口长度 (s)</span>
+                  <span class="param-value">{{ analysisParams.windows_len }}</span>
+                </label>
+                <input
+                  v-model.number="analysisParams.windows_len"
+                  type="range"
+                  min="60"
+                  max="600"
+                  step="10"
+                />
+                <div class="param-hint">范围: 60-600秒, 控制分析窗口大小</div>
+              </div>
+
+              <div class="param-item">
+                <label>
+                  <span class="param-label">阈值</span>
+                  <span class="param-value">{{ analysisParams.thr.toFixed(2) }}</span>
+                </label>
+                <input
+                  v-model.number="analysisParams.thr"
+                  type="range"
+                  min="0.5"
+                  max="1.0"
+                  step="0.01"
+                />
+                <div class="param-hint">范围: 0.50-1.00, 热点检测敏感度阈值</div>
+              </div>
+
+              <div class="param-item">
+                <label>
+                  <span class="param-label">搜索范围 (s)</span>
+                  <span class="param-value">{{ analysisParams.search_range }}</span>
+                </label>
+                <input
+                  v-model.number="analysisParams.search_range"
+                  type="range"
+                  min="30"
+                  max="300"
+                  step="5"
+                />
+                <div class="param-hint">范围: 30-300秒, 峰值搜索范围</div>
+              </div>
+            </div>
+          </div>
+          <div class="advanced-actions">
+            <button class="btn btn-primary" @click="applyAdvancedParams" :disabled="refreshing">
+              {{ refreshing ? '更新中...' : '应用参数并刷新' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </transition>
 
     <StartExploreModal
       v-if="showStartExploreModal"
@@ -169,6 +174,10 @@ export default {
     const analysis = ref({})
     const hotMoments = ref([])
     const timeSeriesData = ref([])
+    const peakMarkerByIndex = ref({})
+    const markerAssignmentReady = ref(false)
+    const contentPanelRef = ref(null)
+    const chartScale = ref(1)
     const refreshing = ref(false)
     const showAdvanced = ref(false)
     const subscriptions = ref([])
@@ -185,15 +194,75 @@ export default {
       const byAnalysis = analysis.value?.streamer_id || analysis.value?.streamer_login || ''
       return byAnalysis ? String(byAnalysis) : ''
     })
+    const vodExternalUrl = computed(() => {
+      const id = String(analysis.value?.video_id || videoId || '').trim()
+      if (!id) return ''
+      return `https://www.twitch.tv/videos/${encodeURIComponent(id)}`
+    })
+    const timeSeriesChartStyle = computed(() => ({
+      transform: `scale(${chartScale.value})`
+    }))
+
+    const handleContentScroll = () => {
+      const scroller = contentPanelRef.value
+      if (!scroller) return
+      const progress = Math.min(1, Math.max(0, scroller.scrollTop / 420))
+      chartScale.value = 1 - progress * 0.5
+    }
 
     const buildHotMomentsWithState = (moments) => {
       return (moments || []).map((moment) => ({
         ...moment,
+        markerNo: null,
         summaryLoading: false,
         summaryError: null,
         summary: null,
         expanded: false
       }))
+    }
+
+    const getOffsetSeconds = (item) => {
+      const offset = item?.offset_seconds ?? item?.offset
+      return Number.isFinite(Number(offset)) ? Number(offset) : 0
+    }
+
+    const assignMarkerNumbersAfterSeriesLoaded = (series, moments) => {
+      const peakIndices = []
+      for (let i = 0; i < series.length; i += 1) {
+        if (series[i]?.is_peak) peakIndices.push(i)
+      }
+
+      const candidates = (moments || []).map((moment) => ({
+        moment,
+        offset: getOffsetSeconds(moment)
+      }))
+      const usedCandidateIndexes = new Set()
+      const markerByPeakIndex = {}
+      let markerNo = 0
+
+      for (const peakIndex of peakIndices) {
+        const peakOffset = getOffsetSeconds(series[peakIndex])
+        let bestCandidateIndex = -1
+        let bestDiff = Number.POSITIVE_INFINITY
+
+        for (let i = 0; i < candidates.length; i += 1) {
+          if (usedCandidateIndexes.has(i)) continue
+          const diff = Math.abs(candidates[i].offset - peakOffset)
+          if (diff < bestDiff) {
+            bestDiff = diff
+            bestCandidateIndex = i
+          }
+        }
+
+        if (bestCandidateIndex >= 0) {
+          usedCandidateIndexes.add(bestCandidateIndex)
+          markerNo += 1
+          markerByPeakIndex[peakIndex] = markerNo
+          candidates[bestCandidateIndex].moment.markerNo = markerNo
+        }
+      }
+
+      return markerByPeakIndex
     }
 
     const loadMomentSummariesSequentially = async (moments, version) => {
@@ -282,6 +351,7 @@ export default {
       const values = series.map((p) => p.score ?? 0)
       const pointBg = series.map((p) => p.is_peak ? '#ef4444' : '#3b82f6')
       const pointRadii = series.map((p) => p.is_peak ? 6 : 2)
+      const markerByPeakIndex = peakMarkerByIndex.value
 
       if (chartInstance) {
         chartInstance.destroy()
@@ -292,8 +362,36 @@ export default {
       const approxLabelWidth = 100
       const maxTicksLimit = Math.max(2, Math.floor(canvasWidth / approxLabelWidth))
       const step = Math.max(1, Math.ceil(labels.length / maxTicksLimit))
+      const peakMarkerNumberPlugin = {
+        id: 'peakMarkerNumber',
+        afterDatasetsDraw(chart) {
+          const datasetMeta = chart.getDatasetMeta(0)
+          if (!datasetMeta?.data?.length) return
+          const chartCtx = chart.ctx
+          chartCtx.save()
+          chartCtx.font = '700 12px system-ui, -apple-system, Segoe UI, sans-serif'
+          chartCtx.textAlign = 'center'
+          chartCtx.textBaseline = 'bottom'
+
+          for (let i = 0; i < datasetMeta.data.length; i += 1) {
+            if (!markerAssignmentReady.value) break
+            const markerNo = markerByPeakIndex[i]
+            if (!markerNo) continue
+            const point = datasetMeta.data[i]
+            const x = point.x
+            const y = point.y - 10
+            chartCtx.strokeStyle = '#ffffff'
+            chartCtx.lineWidth = 3
+            chartCtx.strokeText(String(markerNo), x, y)
+            chartCtx.fillStyle = '#dc2626'
+            chartCtx.fillText(String(markerNo), x, y)
+          }
+          chartCtx.restore()
+        }
+      }
 
       chartInstance = new Chart(ctx, {
+        plugins: [peakMarkerNumberPlugin],
         type: 'line',
         data: {
           labels,
@@ -379,6 +477,8 @@ export default {
 
         if (version !== summaryLoadVersion) return
         timeSeriesData.value = mergedSeries
+        peakMarkerByIndex.value = assignMarkerNumbersAfterSeriesLoaded(mergedSeries, hotMoments.value)
+        markerAssignmentReady.value = true
         if (timeSeriesData.value.length > 0) {
           await nextTick()
           await renderTimeSeriesChart()
@@ -407,6 +507,8 @@ export default {
 
         analysis.value = data || {}
         hotMoments.value = buildHotMomentsWithState((data && data.hot_moments) ? data.hot_moments : [])
+        markerAssignmentReady.value = false
+        peakMarkerByIndex.value = {}
         timeSeriesData.value = []
         if (chartInstance) {
           chartInstance.destroy()
@@ -435,6 +537,13 @@ export default {
         error.value = '刷新失败'
       } finally {
         refreshing.value = false
+      }
+    }
+
+    const applyAdvancedParams = async () => {
+      await refreshAnalysis()
+      if (!error.value) {
+        showAdvanced.value = false
       }
     }
 
@@ -498,6 +607,7 @@ export default {
       loading.value = false
 
       window.addEventListener('login-success', handleLoginSuccess)
+      handleContentScroll()
     })
 
     onBeforeUnmount(() => {
@@ -524,10 +634,16 @@ export default {
       subscriptionsLoading,
       showStartExploreModal,
       activeSubscriptionId,
+      vodExternalUrl,
+      markerAssignmentReady,
+      contentPanelRef,
+      timeSeriesChartStyle,
+      handleContentScroll,
       formatOffset,
       intervalRange,
       toggleExpand,
       refreshAnalysis,
+      applyAdvancedParams,
       openStartExploreModal,
       handleAddStreamer
     }
@@ -575,11 +691,26 @@ export default {
   color: var(--muted);
 }
 
+.vod-link {
+  margin-left: 0.35rem;
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.vod-link:hover {
+  text-decoration: underline;
+}
+
 .time-series-chart {
   margin: 1.5rem 0;
   background: #fff;
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  transform-origin: left top;
+  transition: transform 0.1s linear;
 }
 
 .ai-params-notice {
@@ -627,7 +758,31 @@ export default {
   font-size: 1.1rem;
   font-weight: 600;
   color: #374151;
+  margin: 0;
+}
+
+.chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
   margin-bottom: 1rem;
+}
+
+.btn-advanced {
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #fff;
+  color: #374151;
+  font-size: 0.85rem;
+  font-weight: 500;
+  padding: 0.35rem 0.75rem;
+  cursor: pointer;
+}
+
+.btn-advanced:hover {
+  border-color: #3b82f6;
+  color: #2563eb;
 }
 
 .chart-container {
@@ -716,61 +871,67 @@ export default {
 
 .time {
   font-weight: 700;
-  font-size: 1rem
+  font-size: 1rem;
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.moment-index {
+  color: #dc2626;
+  font-weight: 800;
 }
 
 .interval {
   color: #666;
-  font-size: 0.9rem
+  font-size: 0.9rem;
 }
 
-.advanced-params {
-  margin: 1.5rem 0;
-  background: #ffffff;
-  border-radius: 8px;
-  border: 1px solid #e5e7eb;
+.advanced-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(17, 24, 39, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  padding: 1rem;
+}
+
+.advanced-modal-card {
+  width: 100%;
+  max-width: 520px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.2);
   overflow: hidden;
 }
 
-.advanced-toggle {
+.advanced-modal-header {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 1rem 1.2rem;
-  cursor: pointer;
-  background: #f9fafb;
-  transition: background 0.2s;
-  user-select: none;
+  justify-content: space-between;
+  padding: 0.9rem 1.1rem;
+  border-bottom: 1px solid #e5e7eb;
 }
 
-.advanced-toggle:hover {
-  background: #f3f4f6;
+.advanced-modal-header h4 {
+  margin: 0;
+  font-size: 1rem;
+  color: #111827;
 }
 
-.toggle-icon {
-  font-size: 0.8rem;
+.modal-close {
+  border: none;
+  background: transparent;
+  font-size: 1.3rem;
   color: #6b7280;
-  width: 16px;
-  display: inline-block;
-  transition: transform 0.2s;
+  cursor: pointer;
+  line-height: 1;
 }
 
-.toggle-text {
-  font-weight: 600;
-  color: #374151;
-  font-size: 0.95rem;
-}
-
-.toggle-hint {
-  color: #9ca3af;
-  font-size: 0.85rem;
-  font-style: italic;
-}
-
-.advanced-content {
-  padding: 1.5rem;
-  background: #fafbfc;
-  border-top: 1px solid #e5e7eb;
+.advanced-modal-body {
+  padding: 1rem 1.1rem;
 }
 
 .params-grid {
@@ -850,7 +1011,8 @@ export default {
 }
 
 .advanced-actions {
-  margin-top: 1.2rem;
+  margin-top: 0.2rem;
+  padding: 0 1.1rem 1.1rem;
   display: flex;
   justify-content: flex-end;
 }

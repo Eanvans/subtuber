@@ -151,7 +151,7 @@ export default {
       if (!currentUser.value) return
       
       try {
-        isSubscribed.value = await checkSubscription(props.streamerId)
+        //isSubscribed.value = await checkSubscription(props.streamerId)
       } catch (e) {
         console.error('checkSubscription error', e)
       }

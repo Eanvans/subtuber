@@ -10,9 +10,10 @@
       >
         <div class="rec-info">
           <div class="rec-header">
-            <span class="rec-label">直播标题</span>
-            <div class="rec-title" :title="v.title">{{ v.title }}</div>
+            <span class="rec-time-label">直播时间</span>
+            <div class="rec-live-time">{{ v.created_at ? formatCreatedAt(v.created_at) : '暂无时间' }}</div>
           </div>
+          <div class="rec-title" :title="v.title">{{ v.title }}</div>
           <div class="rec-meta">
             <span class="platform-tag">
               <svg v-if="pDisplay(v.platform) === 'Twitch'" class="platform-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -28,8 +29,6 @@
             </span>
             <span>·</span>
             <span>时长: {{ v.duration }}</span>
-            <span v-if="v.created_at">·</span>
-            <span v-if="v.created_at">{{ formatCreatedAt(v.created_at) }}</span>
           </div>
         </div>
       </router-link>
@@ -50,7 +49,7 @@ export default {
     },
     title: {
       type: String,
-      default: '近期直播回放'
+      default: ''
     }
   },
   setup() {
@@ -81,30 +80,34 @@ export default {
 
 .recording-card {
   width: 100%;
-  background: #fafafa;
-  padding: 10px;
-  border-radius: 6px;
+  background: #f8fafc;
+  padding: 12px;
+  border-radius: 10px;
   display: flex;
   gap: 12px;
   align-items: center;
   margin-bottom: 10px;
   text-decoration: none;
   color: inherit;
+  border: 1px solid #e5e7eb;
+  transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
 }
 
 .recording-card:hover {
   transform: translateY(-4px);
   box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+  border-color: #cbd5e1;
   cursor: pointer;
-  transition: transform 140ms ease, box-shadow 140ms ease;
 }
 
 .rec-title {
   font-weight: 600;
-  color: #111827;
+  font-size: 1.05rem;
+  color: #1f2937;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  margin-bottom: 0.5rem;
 }
 
 .rec-meta {
@@ -138,18 +141,23 @@ export default {
 
 .rec-header {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 0.45rem;
 }
 
-.rec-label {
+.rec-time-label {
   font-size: 0.78rem;
-  color: #6b7280;
-  background: #f3f4f6;
-  padding: 2px 6px;
-  border-radius: 6px;
+  color: #475569;
+  background: #e2e8f0;
+  padding: 2px 7px;
+  border-radius: 999px;
   font-weight: 600;
-  text-transform: none;
+}
+
+.rec-live-time {
+  font-size: 1.08rem;
+  color: #0f172a;
+  font-weight: 800;
 }
 </style>

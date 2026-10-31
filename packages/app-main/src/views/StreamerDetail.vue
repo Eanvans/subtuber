@@ -22,10 +22,10 @@
         <div class="streamer-header">
           <img v-if="avatarUrl" :src="avatarUrl" alt="avatar" class="streamer-avatar" />
           <div class="streamer-info">
-            <h2>{{ streamerName }}</h2>
+            <h2>{{ streamerName }} 的直播回放</h2>
             <p class="streamer-id">ID: {{ streamerId }}</p>
           </div>
-          <button
+          <!-- <button
             class="btn-subscribe"
             :class="{ subscribed: isSubscribed }"
             @click="toggleSubscription"
@@ -34,10 +34,10 @@
             :disabled="subscriptionLoading"
           >
             {{ getButtonText }}
-          </button>
+          </button> -->
         </div>
 
-        <VODList :vods="vods" :analysis-map="analysisMap" :title="`${streamerName} 的直播回放`" />
+        <VODList :vods="vods" :analysis-map="analysisMap"/>
 
         <div v-if="loading" class="loading-state">加载中...</div>
         <div v-else-if="!vods.length" class="empty-state">暂无直播回放记录</div>
@@ -170,7 +170,7 @@ export default {
       }
 
       try {
-        isSubscribed.value = await checkSubscription(streamerId.value)
+        //isSubscribed.value = await checkSubscription(streamerId.value)
       } catch (e) {
         console.error('checkSubscription error', e)
       }
