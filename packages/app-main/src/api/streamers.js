@@ -57,13 +57,22 @@ export async function getStreamingStatus(streamerId) {
   return data || {};
 }
 
-export async function getAnalysis(videoId, windowsLen, thr, searchRange) {
+export async function getAnalysis(videoId, windowsLen, thr, searchRange, options = {}) {
   if (!videoId) throw new Error('videoId required');
   
   const params = new URLSearchParams();
   if (windowsLen !== undefined) params.append('windows_len', String(windowsLen));
   if (thr !== undefined) params.append('thr', String(thr));
   if (searchRange !== undefined) params.append('search_range', String(searchRange));
+  if (options.includeTimeSeries !== undefined) {
+    params.append('include_time_series', String(Boolean(options.includeTimeSeries)));
+  }
+  if (options.timeSeriesOffset !== undefined && options.timeSeriesOffset !== null) {
+    params.append('time_series_offset', String(options.timeSeriesOffset));
+  }
+  if (options.timeSeriesLimit !== undefined && options.timeSeriesLimit !== null) {
+    params.append('time_series_limit', String(options.timeSeriesLimit));
+  }
   
   const queryString = params.toString();
   const url = `/api/twitch/analysis/${encodeURIComponent(videoId)}${queryString ? '?' + queryString : ''}`;

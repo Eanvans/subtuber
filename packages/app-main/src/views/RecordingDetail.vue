@@ -156,6 +156,8 @@ export default {
     SubscriptionSidebar
   },
   setup() {
+    const TIME_SERIES_PAGE_SIZE = 1200
+    const MAX_TIME_SERIES_PAGES = 200
     let chartInstance = null
     let summaryLoadVersion = 0
     const route = useRoute()
@@ -348,22 +350,73 @@ export default {
       })
     }
 
+    const loadTimeSeriesPaged = async (version, windowsLen, thr, searchRange) => {
+      try {
+        const mergedSeries = []
+        let offset = 0
+
+        for (let page = 0; page < MAX_TIME_SERIES_PAGES; page += 1) {
+          if (version !== summaryLoadVersion) return
+          const pageData = await getAnalysis(
+            videoId,
+            windowsLen,
+            thr,
+            searchRange,
+            {
+              includeTimeSeries: true,
+              timeSeriesOffset: offset,
+              timeSeriesLimit: TIME_SERIES_PAGE_SIZE
+            }
+          )
+          if (version !== summaryLoadVersion) return
+          const chunk = Array.isArray(pageData?.time_series_data) ? pageData.time_series_data : []
+          if (!chunk.length) break
+
+          mergedSeries.push(...chunk)
+          if (chunk.length < TIME_SERIES_PAGE_SIZE) break
+          offset += chunk.length
+        }
+
+        if (version !== summaryLoadVersion) return
+        timeSeriesData.value = mergedSeries
+        if (timeSeriesData.value.length > 0) {
+          await nextTick()
+          await renderTimeSeriesChart()
+        }
+      } catch (seriesErr) {
+        if (version !== summaryLoadVersion) return
+        console.error('RecordingDetail loadTimeSeriesPaged error', seriesErr)
+      }
+    }
+
     const fetchAnalysisData = async () => {
       try {
         const version = ++summaryLoadVersion
+        const windowsLen = analysisParams.value.windows_len
+        const thr = analysisParams.value.thr
+        const searchRange = analysisParams.value.search_range
+
         const data = await getAnalysis(
           videoId, 
-          analysisParams.value.windows_len,
-          analysisParams.value.thr,
-          analysisParams.value.search_range
+          windowsLen,
+          thr,
+          searchRange,
+          { includeTimeSeries: false }
         )
+        if (version !== summaryLoadVersion) return
+
         analysis.value = data || {}
         hotMoments.value = buildHotMomentsWithState((data && data.hot_moments) ? data.hot_moments : [])
-        timeSeriesData.value = (data && data.time_series_data) ? data.time_series_data : []
+        timeSeriesData.value = []
+        if (chartInstance) {
+          chartInstance.destroy()
+          chartInstance = null
+        }
 
         if (hotMoments.value.length > 0) {
           void loadMomentSummariesSequentially(hotMoments.value, version)
         }
+        void loadTimeSeriesPaged(version, windowsLen, thr, searchRange)
       } catch (e) {
         console.error('RecordingDetail getAnalysis error', e)
         error.value = '加载失败'
@@ -377,12 +430,6 @@ export default {
       
       try {
         await fetchAnalysisData()
-        
-        // 重新渲染图表
-        if (timeSeriesData.value.length > 0) {
-          await nextTick()
-          await renderTimeSeriesChart()
-        }
       } catch (e) {
         console.error('Refresh analysis error', e)
         error.value = '刷新失败'
@@ -449,11 +496,6 @@ export default {
         fetchSubscriptions()
       ])
       loading.value = false
-
-      if (timeSeriesData.value.length > 0) {
-        await nextTick()
-        await renderTimeSeriesChart()
-      }
 
       window.addEventListener('login-success', handleLoginSuccess)
     })
