@@ -1,326 +1,257 @@
 <template>
   <div class="home-page">
     <main class="main-content">
-        <div class="card" style="max-width: 960px; margin: 0 auto">
+      <div class="home-layout">
+        <SubscriptionSidebar
+          title="我的订阅"
+          :items="streamers"
+          :loading="loading"
+          empty-text="还没有订阅主播"
+          :show-add-button="true"
+          @add-click="showStartExploreModal = true"
+        />
+
+        <section class="content-panel">
           <div class="text-left mb-3">
-            <h2
-              style="
-                font-size: 1.5rem;
-                margin-bottom: 1rem;
-                color: var(--muted);
-              "
-            >
-              我的订阅
-            </h2>
-            <p class="subtitle">这里显示你订阅的主播，自动获取他们近期直播中的高光时刻</p>
+            <h2 class="page-title">SubTuber 使用说明</h2>
+            <p class="subtitle">首页模板：3 步快速开始，先订阅主播，再查看回放热点，最后持续优化你的订阅列表。</p>
           </div>
 
-          <!-- 加载状态 -->
-          <div v-if="loading" class="loading-state">
-            <p>加载中...</p>
-          </div>
+          <section class="guide-section">
+            <article class="guide-card">
+              <div class="guide-media">
+                <svg viewBox="0 0 120 90" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="8" y="8" width="104" height="74" rx="10" fill="#EEF2FF" />
+                  <circle cx="34" cy="45" r="14" fill="#C7D2FE" />
+                  <rect x="56" y="30" width="38" height="8" rx="4" fill="#818CF8" />
+                  <rect x="56" y="45" width="30" height="7" rx="3.5" fill="#A5B4FC" />
+                  <rect x="56" y="57" width="24" height="7" rx="3.5" fill="#C7D2FE" />
+                </svg>
+              </div>
+              <div class="guide-content">
+                <h3>1. 添加订阅主播</h3>
+                <p>点击左侧「+ 订阅」，输入主播信息，建立你的专属订阅列表。</p>
+              </div>
+            </article>
 
-          <!-- 空状态 -->
-          <div v-else-if="streamers.length === 0" class="empty-state">
-            <div class="empty-icon">
-              <svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <!-- 背景圆形 -->
-                <circle cx="60" cy="60" r="60" fill="url(#gradient1)"/>
-                <!-- 电视屏幕 -->
-                <rect x="25" y="30" width="70" height="50" rx="4" fill="white" opacity="0.9"/>
-                <!-- 屏幕内容（播放符号） -->
-                <path d="M50 45 L50 65 L70 55 Z" fill="url(#gradient2)"/>
-                <!-- 电视底座 -->
-                <rect x="50" y="82" width="20" height="3" rx="1.5" fill="white" opacity="0.8"/>
-                <rect x="45" y="85" width="30" height="2" rx="1" fill="white" opacity="0.6"/>
-                <!-- 装饰点 -->
-                <circle cx="85" cy="25" r="3" fill="white" opacity="0.5"/>
-                <circle cx="95" cy="35" r="2" fill="white" opacity="0.5"/>
-                <circle cx="25" cy="90" r="2.5" fill="white" opacity="0.5"/>
-                
-                <defs>
-                  <linearGradient id="gradient1" x1="0" y1="0" x2="120" y2="120">
-                    <stop offset="0%" stop-color="#667eea"/>
-                    <stop offset="100%" stop-color="#764ba2"/>
-                  </linearGradient>
-                  <linearGradient id="gradient2" x1="50" y1="45" x2="70" y2="65">
-                    <stop offset="0%" stop-color="#667eea"/>
-                    <stop offset="100%" stop-color="#764ba2"/>
-                  </linearGradient>
-                </defs>
-              </svg>
-            </div>
-            <h3>还没有订阅任何主播</h3>
-            <p>快来添加你的第一个订阅的主播吧！</p>
-            <button @click="showStartExploreModal = true" class="btn-primary">点击这里开始你的探索</button>
-          </div>
+            <article class="guide-card">
+              <div class="guide-media">
+                <svg viewBox="0 0 120 90" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="8" y="8" width="104" height="74" rx="10" fill="#ECFDF5" />
+                  <polyline points="22,60 38,45 52,52 70,30 92,42" fill="none" stroke="#10B981" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
+                  <circle cx="92" cy="42" r="5" fill="#059669" />
+                </svg>
+              </div>
+              <div class="guide-content">
+                <h3>2. 查看直播热点</h3>
+                <p>进入主播详情页，系统会展示回放与热点时段，帮助你快速回顾精彩内容。</p>
+              </div>
+            </article>
 
-          <!-- 主播列表 -->
-          <div v-else class="live-section">
-            <StreamerCard
-              v-for="streamer in streamers"
-              :key="streamer.id"
-              :streamer-name="streamer.name"
-              :streamer-id="streamer.id"
-              :streamer-platforms="streamer.platforms"
-              :avatar-url="streamer.profile_image_url"
-              :check-status-fn="getStreamingStatus"
-              :auto-refresh="true"
-              :refresh-interval="30000"
-            />
-            
-            <!-- 添加更多主播提示卡片 -->
-            <AddStreamerCard 
-              title="订阅更多的主播" 
-              description=""
-              @click="showStartExploreModal = true" 
-            />
-          </div>
-        </div>
+            <article class="guide-card">
+              <div class="guide-media">
+                <svg viewBox="0 0 120 90" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="8" y="8" width="104" height="74" rx="10" fill="#FEF3C7" />
+                  <rect x="24" y="26" width="72" height="8" rx="4" fill="#F59E0B" />
+                  <rect x="24" y="42" width="60" height="8" rx="4" fill="#FCD34D" />
+                  <rect x="24" y="58" width="48" height="8" rx="4" fill="#FDE68A" />
+                </svg>
+              </div>
+              <div class="guide-content">
+                <h3>3. 持续优化列表</h3>
+                <p>根据观看偏好增减订阅，保持列表精简，让首页始终聚焦你最关心的主播。</p>
+              </div>
+            </article>
+          </section>
+        </section>
+      </div>
     </main>
 
-    <!-- 添加主播弹窗 -->
-    <AddStreamerModal
-      v-if="showAddModal"
-      @close="showAddModal = false"
-      @submit="handleAddStreamer"
-    />
-
-    <!-- 开始探索弹窗 -->
     <StartExploreModal
       v-if="showStartExploreModal"
       @close="showStartExploreModal = false"
       @add-streamer="handleAddStreamer"
     />
   </div>
-  
 </template>
 
 <script>
-import { ref, onMounted, onBeforeUnmount } from "vue";
-import { useRouter } from "vue-router";
-import { getTwitchStatus, getStreamingStatus, subscribeStreamer } from "../api/streamers";
-import StreamerCard from "../components/StreamerCard.vue";
-import AddStreamerCard from "../components/AddStreamerCard.vue";
-import AddStreamerModal from "../components/AddStreamerModal.vue";
-import StartExploreModal from "../components/StartExploreModal.vue";
-import { useAuth } from "../composables/useAuth";
-import { showNotification } from "../utils/notification";
+import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { subscribeStreamer } from '../api/streamers'
+import StartExploreModal from '../components/StartExploreModal.vue'
+import SubscriptionSidebar from '../components/SubscriptionSidebar.vue'
+import { useAuth } from '../composables/useAuth'
+import { showNotification } from '../utils/notification'
 
 export default {
   components: {
-    StreamerCard,
-    AddStreamerCard,
-    AddStreamerModal,
-    StartExploreModal
+    StartExploreModal,
+    SubscriptionSidebar
   },
   setup() {
-    const router = useRouter();
-    const { currentUser } = useAuth();
-    const loading = ref(false);
-    const showAddModal = ref(false);
-    const showStartExploreModal = ref(false);
+    const { currentUser } = useAuth()
+    const loading = ref(false)
+    const showStartExploreModal = ref(false)
+    const streamers = ref([])
 
-    // 用户订阅的主播列表
-    const streamers = ref([]);
-
-    // 获取用户订阅的主播列表
     const fetchStreamers = async () => {
-      // 如果没有登录，不请求订阅列表
       if (!currentUser.value) {
-        streamers.value = [];
-        loading.value = false;
-        return;
+        streamers.value = []
+        loading.value = false
+        return
       }
-      
-      loading.value = true;
-      try {
-        const response = await fetch('/api/user/subscriptions');
-        if (!response.ok) {
-          throw new Error('获取订阅列表失败');
-        }
-        const data = await response.json();
-        streamers.value = data?.streamers || [];
-      } catch (e) {
-        console.error('获取订阅主播列表失败:', e);
-        streamers.value = [];
-      } finally {
-        loading.value = false;
-      }
-    };
 
-    // 登录成功后刷新列表
+      loading.value = true
+      try {
+        const response = await fetch('/api/user/subscriptions')
+        if (!response.ok) {
+          throw new Error('获取订阅列表失败')
+        }
+        const data = await response.json()
+        streamers.value = data?.streamers || []
+      } catch (e) {
+        console.error('获取订阅主播列表失败:', e)
+        streamers.value = []
+      } finally {
+        loading.value = false
+      }
+    }
+
     const handleLoginSuccess = () => {
-      fetchStreamers();
-    };
+      fetchStreamers()
+    }
 
     onMounted(() => {
-      fetchStreamers();
-      window.addEventListener('login-success', handleLoginSuccess);
-    });
+      fetchStreamers()
+      window.addEventListener('login-success', handleLoginSuccess)
+    })
 
     onBeforeUnmount(() => {
-      window.removeEventListener('login-success', handleLoginSuccess);
-    });
-
-    const handleSearch = async () => {
-      // 搜索功能已移除
-    };
-
-    const handleAddStreamerClick = () => {
-      if (!currentUser.value) {
-        showNotification('请先登录后使用');
-        return;
-      }
-      showAddModal.value = true;
-    };
+      window.removeEventListener('login-success', handleLoginSuccess)
+    })
 
     const handleAddStreamer = async (streamerData) => {
       try {
-        // 调用 API 添加主播
-        await subscribeStreamer(streamerData);
-        
-        // 重新获取主播列表
-        await fetchStreamers();
-        
-        showAddModal.value = false;
+        await subscribeStreamer(streamerData)
+        await fetchStreamers()
       } catch (e) {
-        console.error('添加主播失败:', e);
-        showNotification(e.message || '添加主播失败，请稍后重试');
+        console.error('添加主播失败:', e)
+        showNotification(e.message || '添加主播失败，请稍后重试')
       }
-    };
+    }
 
     return {
       loading,
       streamers,
-      getTwitchStatus,
-      getStreamingStatus,
-      showAddModal,
       showStartExploreModal,
-      handleAddStreamer,
-      handleAddStreamerClick,
-    };
-  },
-};
+      handleAddStreamer
+    }
+  }
+}
 </script>
 
 <style scoped>
 .home-page {
-  min-height: 70vh;
   display: flex;
   flex-direction: column;
 }
 
 .main-content {
   flex: 1 1 auto;
-  overflow: auto;
-}
-
-.card {
-  padding-bottom: 1rem;
-}
-
-.loading-state {
-  text-align: center;
-  padding: 2rem;
-  color: var(--muted);
-}
-
-.empty-state {
-  text-align: center;
-  padding: 3rem 1rem;
-  color: var(--muted);
-}
-
-.empty-icon {
-  width: 120px;
-  height: 120px;
-  margin: 0 auto 1.5rem;
-  animation: float 3s ease-in-out infinite;
-}
-
-@keyframes float {
-  0%, 100% {
-    transform: translateY(0px);
-  }
-  50% {
-    transform: translateY(-10px);
-  }
-}
-
-.empty-state h3 {
-  font-size: 1.25rem;
-  margin-bottom: 0.5rem;
-  color: var(--text-primary);
-}
-
-.empty-state p {
-  margin-bottom: 1.5rem;
-  color: var(--muted);
-}
-
-.btn-primary {
-  padding: 0.75rem 1.5rem;
-  background: var(--primary, #6366f1);
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.btn-primary:hover {
-  background: var(--primary-hover, #4f46e5);
-}
-
-.result-item {
-  display: flex;
-  justify-content: space-between;
-  padding: 0.75rem;
-  border-radius: 8px;
-  margin-bottom: 0.5rem;
-  text-decoration: none;
-  color: inherit;
-}
-.login-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-.login-card {
-  width: 420px;
-  max-width: 95%;
-  background: var(--card, #fff);
+  overflow: hidden;
   padding: 1rem;
-  border-radius: 8px;
-  position: relative;
-}
-.btn-close {
-  position: absolute;
-  right: 8px;
-  top: 8px;
-  border: none;
-  background: transparent;
-  font-size: 1.25rem;
 }
 
-/* Live card styles */
-.live-section {
-  margin-top: 1rem;
+.home-layout {
+  --sidebar-width: 280px;
+  --sidebar-top: 92px;
+  --panel-height: 80vh;
+  --sidebar-height: var(--panel-height);
+  max-width: 1300px;
+  margin: 0 auto;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 1.5rem;
-  justify-items: center;
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  gap: 1rem;
+}
+
+.content-panel {
+  background: var(--card, #fff);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.content-panel {
+  padding: 1.5rem;
+  height: var(--panel-height);
+  overflow-y: auto;
+}
+
+.page-title {
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+  color: var(--muted, #374151);
 }
 
 .subtitle {
   font-size: 0.95rem;
   color: #6b7280;
   margin-top: 0.25rem;
+}
+
+.guide-section {
+  margin-top: 1.25rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+.guide-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1rem;
+  background: #fff;
+}
+
+.guide-media {
+  width: 100%;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #f9fafb;
+}
+
+.guide-media svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.guide-content h3 {
+  margin: 0.85rem 0 0.4rem;
+  font-size: 1.05rem;
+  color: #111827;
+}
+
+.guide-content p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #4b5563;
+  line-height: 1.5;
+}
+
+@media (max-width: 1024px) {
+  .main-content {
+    overflow: auto;
+  }
+
+  .home-layout {
+    grid-template-columns: 1fr;
+    --panel-height: auto;
+    --sidebar-height: auto;
+  }
+
+  .content-panel {
+    height: auto;
+    overflow: visible;
+  }
 }
 </style>

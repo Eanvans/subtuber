@@ -1,8 +1,6 @@
 <template>
   <div class="settings-page">
     <div class="main-content">
-      <button class="btn btn-ghost" @click="$router.back()">← 返回</button>
-      
       <div class="header-row">
         <h2>用户设置</h2>
         <button @click="handleLogout" class="btn btn-danger">注销登录</button>

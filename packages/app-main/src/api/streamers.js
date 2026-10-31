@@ -5,12 +5,31 @@ export async function getStreamers() {
   return (data && data.streamers) ? data.streamers : [];
 }
 
-export async function getStreamerVODs(streamerId) {
+export async function getStreamerVODs(streamerId, options = {}) {
   if (!streamerId) throw new Error('streamerId required');
-  const res = await fetch(`/api/streamers/${encodeURIComponent(streamerId)}`);
+
+  const params = new URLSearchParams();
+  if (options.limit !== undefined && options.limit !== null) {
+    params.append('limit', String(options.limit));
+  }
+  if (options.offset !== undefined && options.offset !== null) {
+    params.append('offset', String(options.offset));
+  }
+
+  const queryString = params.toString();
+  const url = `/api/streamers/${encodeURIComponent(streamerId)}${queryString ? `?${queryString}` : ''}`;
+
+  const res = await fetch(url);
   if (!res.ok) throw new Error(`/api/streamers/${streamerId} fetch failed`);
   const data = await res.json();
-  return (data && data.vods) ? data.vods : [];
+  const vods = Array.isArray(data) ? data : ((data && data.vods) ? data.vods : []);
+
+  return {
+    vods,
+    hasMore: typeof data?.has_more === 'boolean' ? data.has_more : null,
+    nextOffset: typeof data?.next_offset === 'number' ? data.next_offset : null,
+    total: typeof data?.total === 'number' ? data.total : null
+  };
 }
 
 export async function getTwitchStatus(streamerId) {

@@ -10,9 +10,11 @@
     
     <nav class="navbar">
       <div class="navbar-container">
-        <router-link to="/" class="brand">SubTuber</router-link>
+        <div class="brand-row">
+          <router-link to="/" class="brand">SubTuber</router-link>
+          <button class="nav-back" :disabled="!canGoBack" @click="goBack">← 返回</button>
+        </div>
         <div class="nav-links">
-          <router-link to="/" class="nav-link">我的订阅</router-link>
         </div>
         <div class="nav-actions">
           <router-link v-if="currentUser" to="/settings" class="btn btn-ghost">
@@ -75,8 +77,8 @@
 </template>
 
 <script>
-import { ref, onMounted, onBeforeUnmount } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, onBeforeUnmount, computed } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import Login from '../../shared-auth/Login.vue'
 import { useAuth } from './composables/useAuth'
 
@@ -85,6 +87,7 @@ export default {
   components: { Login },
   setup() {
     const router = useRouter()
+    const route = useRoute()
     const showLogin = ref(false)
     const { currentUser, setUser } = useAuth()
     const currentYear = new Date().getFullYear()
@@ -121,6 +124,11 @@ export default {
     }
     const onSent = () => {}
     const onLoginError = (e) => { console.error(e) }
+    const canGoBack = computed(() => route.path !== '/')
+    const goBack = () => {
+      if (!canGoBack.value) return
+      router.back()
+    }
 
     return { 
       showLogin, 
@@ -130,13 +138,42 @@ export default {
       onSent, 
       onLoginError,
       showNotification,
-      notificationMessage
+      notificationMessage,
+      canGoBack,
+      goBack
     }
   }
 }
 </script>
 
 <style>
+.brand-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.nav-back {
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #fff;
+  color: #374151;
+  font-size: 0.9rem;
+  font-weight: 500;
+  padding: 0.4rem 0.8rem;
+  cursor: pointer;
+}
+
+.nav-back:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.nav-back:not(:disabled):hover {
+  border-color: #3b82f6;
+  color: #2563eb;
+}
+
 .notification-banner {
   position: fixed;
   top: 80px;
@@ -375,3 +412,9 @@ export default {
   }
 }
 </style>
+    const canGoBack = computed(() => route.path !== '/')
+
+    const goBack = () => {
+      if (!canGoBack.value) return
+      router.back()
+    }

@@ -1,141 +1,164 @@
 <template>
-  <div class="recording-detail card" style="max-width: 960px; margin: 1rem auto; width: 100%;">
-    <button class="btn btn-ghost" @click="$router.back()">← 返回</button>
-    <h2 style="margin-top: 0.5rem;">直播热点时段</h2>
-    <div v-if="loading">加载中…</div>
-    <div v-else-if="error" class="error">{{ error }}</div>
-    <div v-else>
-      <div class="meta-row">
-        <div><strong>VOD ID:</strong> {{ analysis.video_id || videoId }}</div>
-        <div><strong>主播:</strong> {{ analysis.streamer_name || '-' }}</div>
-      </div>
+  <div class="recording-detail-page">
+    <div class="recording-layout">
+      <SubscriptionSidebar
+        title="我的订阅"
+        :items="subscriptions"
+        :loading="subscriptionsLoading"
+        empty-text="暂时还没有订阅主播"
+        :active-id="activeSubscriptionId"
+        :show-add-button="true"
+        @add-click="openStartExploreModal"
+      />
 
-      <!-- 时间序列折线图 -->
-      <section class="time-series-chart">
-        <h3>直播热度趋势</h3>
-        <div class="chart-container">
-          <canvas id="timeSeriesChart" style="width:100%; height:100%"></canvas>
-        </div>
-      </section>
+      <section class="content-panel">
+        <h2 class="page-title">直播热点时段</h2>
 
-      <!-- 高级参数调节 (可折叠) -->
-      <section class="advanced-params">
-        <div class="advanced-toggle" @click="showAdvanced = !showAdvanced">
-          <span class="toggle-icon">{{ showAdvanced ? '▼' : '▶' }}</span>
-          <span class="toggle-text">高级参数调节</span>
-          <span class="toggle-hint">(调整分析算法参数)</span>
-        </div>
-        
-        <transition name="slide-fade">
-          <div v-show="showAdvanced" class="advanced-content">
-            <div class="params-grid">
-              <div class="param-item">
-                <label>
-                  <span class="param-label">窗口长度 (s)</span>
-                  <span class="param-value">{{ analysisParams.windows_len }}</span>
-                </label>
-                <input 
-                  type="range" 
-                  v-model.number="analysisParams.windows_len" 
-                  min="60" 
-                  max="600" 
-                  step="10"
-                />
-                <div class="param-hint">范围: 60-600秒, 控制分析窗口大小</div>
-              </div>
+        <div v-if="loading" class="status-block">加载中…</div>
+        <div v-else-if="error" class="status-block error">{{ error }}</div>
+        <div v-else>
+          <div class="meta-row">
+            <div><strong>VOD ID:</strong> {{ analysis.video_id || videoId }}</div>
+            <div><strong>主播:</strong> {{ analysis.streamer_name || '-' }}</div>
+          </div>
 
-              <div class="param-item">
-                <label>
-                  <span class="param-label">阈值</span>
-                  <span class="param-value">{{ analysisParams.thr.toFixed(2) }}</span>
-                </label>
-                <input 
-                  type="range" 
-                  v-model.number="analysisParams.thr" 
-                  min="0.5" 
-                  max="1.0" 
-                  step="0.01"
-                />
-                <div class="param-hint">范围: 0.50-1.00, 热点检测敏感度阈值</div>
-              </div>
-
-              <div class="param-item">
-                <label>
-                  <span class="param-label">搜索范围 (s)</span>
-                  <span class="param-value">{{ analysisParams.search_range }}</span>
-                </label>
-                <input 
-                  type="range" 
-                  v-model.number="analysisParams.search_range" 
-                  min="30" 
-                  max="300" 
-                  step="5"
-                />
-                <div class="param-hint">范围: 30-300秒, 峰值搜索范围</div>
-              </div>
+          <section class="time-series-chart">
+            <h3>直播热度趋势</h3>
+            <div class="chart-container">
+              <canvas id="timeSeriesChart" style="width:100%; height:100%"></canvas>
             </div>
-            <div class="advanced-actions">
-              <button class="btn btn-primary" @click="refreshAnalysis" :disabled="refreshing">
-                {{ refreshing ? '更新中...' : '应用参数并刷新' }}
-              </button>
+          </section>
+
+          <section class="advanced-params">
+            <div class="advanced-toggle" @click="showAdvanced = !showAdvanced">
+              <span class="toggle-icon">{{ showAdvanced ? '▼' : '▶' }}</span>
+              <span class="toggle-text">高级参数调节</span>
+              <span class="toggle-hint">(调整分析算法参数)</span>
+            </div>
+
+            <transition name="slide-fade">
+              <div v-show="showAdvanced" class="advanced-content">
+                <div class="params-grid">
+                  <div class="param-item">
+                    <label>
+                      <span class="param-label">窗口长度 (s)</span>
+                      <span class="param-value">{{ analysisParams.windows_len }}</span>
+                    </label>
+                    <input
+                      v-model.number="analysisParams.windows_len"
+                      type="range"
+                      min="60"
+                      max="600"
+                      step="10"
+                    />
+                    <div class="param-hint">范围: 60-600秒, 控制分析窗口大小</div>
+                  </div>
+
+                  <div class="param-item">
+                    <label>
+                      <span class="param-label">阈值</span>
+                      <span class="param-value">{{ analysisParams.thr.toFixed(2) }}</span>
+                    </label>
+                    <input
+                      v-model.number="analysisParams.thr"
+                      type="range"
+                      min="0.5"
+                      max="1.0"
+                      step="0.01"
+                    />
+                    <div class="param-hint">范围: 0.50-1.00, 热点检测敏感度阈值</div>
+                  </div>
+
+                  <div class="param-item">
+                    <label>
+                      <span class="param-label">搜索范围 (s)</span>
+                      <span class="param-value">{{ analysisParams.search_range }}</span>
+                    </label>
+                    <input
+                      v-model.number="analysisParams.search_range"
+                      type="range"
+                      min="30"
+                      max="300"
+                      step="5"
+                    />
+                    <div class="param-hint">范围: 30-300秒, 峰值搜索范围</div>
+                  </div>
+                </div>
+                <div class="advanced-actions">
+                  <button class="btn btn-primary" @click="refreshAnalysis" :disabled="refreshing">
+                    {{ refreshing ? '更新中...' : '应用参数并刷新' }}
+                  </button>
+                </div>
+              </div>
+            </transition>
+          </section>
+
+          <div class="ai-params-notice">
+            <div class="notice-icon">ℹ️</div>
+            <div class="notice-content">
+              <div class="notice-title">AI 分析参数说明</div>
+              <div class="notice-text">
+                当前使用默认参数: 窗口长度 420秒 (7分钟) | 阈值 0.9 (90百分位) | 搜索范围 210秒 (3.5分钟)
+              </div>
+              <div class="notice-dev">⚠️ 实时更新 AI 总结功能还在开发中</div>
             </div>
           </div>
-        </transition>
-      </section>
 
-      <!-- AI分析参数说明 -->
-      <div class="ai-params-notice">
-        <div class="notice-icon">ℹ️</div>
-        <div class="notice-content">
-          <div class="notice-title">AI 分析参数说明</div>
-          <div class="notice-text">
-            当前使用默认参数: 窗口长度 420秒 (7分钟) | 阈值 0.9 (90百分位) | 搜索范围 210秒 (3.5分钟)
-          </div>
-          <div class="notice-dev">⚠️ 实时更新 AI 总结功能还在开发中</div>
-        </div>
-      </div>
-
-      <section class="hot-moments">
-        <div v-if="!hotMoments.length">没有可展示的片段。</div>
-        <div class="moments-list">
-          <div class="moment" v-for="(m, idx) in hotMoments" :key="idx">
-            <div class="moment-left">
-              <div class="time">{{ intervalRange(m) }}</div>
-              <div class="interval">{{ m.time_interval || '' }}</div>
-              <div><strong>热点得分:</strong> {{ m.comments_score }}</div>
-            </div>
-            <div class="moment-right">
-              <!-- Placeholder area for AI analysis / clip preview -->
-              <div 
-                class="moment-preview" 下·
-                :class="{ loading: m.summaryLoading, expanded: m.expanded, clickable: m.summary && !m.summaryLoading }"
-                @click="m.summary && !m.summaryLoading && toggleExpand(m)"
-              >
-                <div v-if="m.summaryLoading" class="loading-text">加载分析中...</div>
-                <div v-else-if="m.summaryError" class="error-text">{{ m.summaryError }}</div>
-                <div v-else-if="m.summary" class="summary-text">{{ m.summary }}</div>
-                <div v-else class="placeholder-text">内容占位：AI 分析输出将显示在这里（占位灰色框）</div>
+          <section class="hot-moments">
+            <div v-if="!hotMoments.length">没有可展示的片段。</div>
+            <div class="moments-list">
+              <div v-for="(m, idx) in hotMoments" :key="idx" class="moment">
+                <div class="moment-left">
+                  <div class="time">{{ intervalRange(m) }}</div>
+                  <div class="interval">{{ m.time_interval || '' }}</div>
+                  <div><strong>热点得分:</strong> {{ m.comments_score }}</div>
+                </div>
+                <div class="moment-right">
+                  <div
+                    class="moment-preview"
+                    :class="{ loading: m.summaryLoading, expanded: m.expanded, clickable: m.summary && !m.summaryLoading }"
+                    @click="m.summary && !m.summaryLoading && toggleExpand(m)"
+                  >
+                    <div v-if="m.summaryLoading" class="loading-text">加载分析中...</div>
+                    <div v-else-if="m.summaryError" class="error-text">{{ m.summaryError }}</div>
+                    <div v-else-if="m.summary" class="summary-text">{{ m.summary }}</div>
+                    <div v-else class="placeholder-text">内容占位：AI 分析输出将显示在这里（占位灰色框）</div>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+          </section>
         </div>
       </section>
     </div>
+
+    <StartExploreModal
+      v-if="showStartExploreModal"
+      @close="showStartExploreModal = false"
+      @add-streamer="handleAddStreamer"
+    />
   </div>
 </template>
 
 <script>
-import { ref, onMounted, nextTick } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { getAnalysis, getAnalysisSummary } from '../api/streamers'
+import { ref, onMounted, onBeforeUnmount, nextTick, computed } from 'vue'
+import { useRoute } from 'vue-router'
+import { getAnalysis, getAnalysisSummary, subscribeStreamer } from '../api/streamers'
 import { useAuth } from '../composables/useAuth'
+import StartExploreModal from '../components/StartExploreModal.vue'
+import SubscriptionSidebar from '../components/SubscriptionSidebar.vue'
 import Chart from 'chart.js/auto'
 
 export default {
+  name: 'RecordingDetail',
+  components: {
+    StartExploreModal,
+    SubscriptionSidebar
+  },
   setup() {
     let chartInstance = null
+    let summaryLoadVersion = 0
     const route = useRoute()
-    const router = useRouter()
     const { currentUser } = useAuth()
     const videoId = route.params.video_id
     const platform = ref(route.query.platform || '')
@@ -146,11 +169,62 @@ export default {
     const timeSeriesData = ref([])
     const refreshing = ref(false)
     const showAdvanced = ref(false)
+    const subscriptions = ref([])
+    const subscriptionsLoading = ref(false)
+    const showStartExploreModal = ref(false)
     const analysisParams = ref({
       windows_len: 420,
       thr: 0.90,
       search_range: 210
     })
+    const activeSubscriptionId = computed(() => {
+      const byQuery = String(route.query.streamer_id || '')
+      if (byQuery) return byQuery
+      const byAnalysis = analysis.value?.streamer_id || analysis.value?.streamer_login || ''
+      return byAnalysis ? String(byAnalysis) : ''
+    })
+
+    const buildHotMomentsWithState = (moments) => {
+      return (moments || []).map((moment) => ({
+        ...moment,
+        summaryLoading: false,
+        summaryError: null,
+        summary: null,
+        expanded: false
+      }))
+    }
+
+    const loadMomentSummariesSequentially = async (moments, version) => {
+      const isYoutube = platform.value && platform.value.toLowerCase().includes('youtube')
+      const userHash = currentUser.value
+        ? (currentUser.value.userId || currentUser.value.user_id || currentUser.value.userHash || currentUser.value.user_hash || currentUser.value.hash || currentUser.value.id || null)
+        : null
+
+      for (const moment of moments) {
+        if (version !== summaryLoadVersion) return
+
+        if (isYoutube) {
+          moment.summary = 'YouTube总结因为Youtube的下载不稳定，暂时没有很好的解决方案，欢迎大佬加群交流和讨论。'
+          continue
+        }
+
+        const offset = moment.offset_seconds ?? moment.offset ?? 0
+        moment.summaryLoading = true
+        try {
+          const summary = await getAnalysisSummary(videoId, offset, userHash)
+          if (version !== summaryLoadVersion) return
+          moment.summary = summary
+        } catch (err) {
+          if (version !== summaryLoadVersion) return
+          console.error(`加载摘要失败 (offset: ${offset})`, err)
+          moment.summaryError = '加载失败'
+        } finally {
+          if (version === summaryLoadVersion) {
+            moment.summaryLoading = false
+          }
+        }
+      }
+    }
 
     const formatOffset = (sec) => {
       if (sec == null || isNaN(sec)) return ''
@@ -276,6 +350,7 @@ export default {
 
     const fetchAnalysisData = async () => {
       try {
+        const version = ++summaryLoadVersion
         const data = await getAnalysis(
           videoId, 
           analysisParams.value.windows_len,
@@ -283,40 +358,11 @@ export default {
           analysisParams.value.search_range
         )
         analysis.value = data || {}
-        hotMoments.value = (data && data.hot_moments) ? data.hot_moments : []
+        hotMoments.value = buildHotMomentsWithState((data && data.hot_moments) ? data.hot_moments : [])
         timeSeriesData.value = (data && data.time_series_data) ? data.time_series_data : []
 
-         // 异步加载每个热点时段的分析摘要
         if (hotMoments.value.length > 0) {
-          hotMoments.value.forEach(async (moment, idx) => {
-            const offset = moment.offset_seconds ?? moment.offset ?? 0;
-            // 为每个moment添加加载状态
-            moment.summaryLoading = false;
-            moment.summaryError = null;
-            moment.summary = null;
-            moment.expanded = false;
-            
-            // 检查是否为YouTube平台
-            if (platform.value && platform.value.toLowerCase().includes('youtube')) {
-              moment.summary = 'YouTube总结因为Youtube的下载不稳定，暂时没有很好的解决方案，欢迎大佬加群交流和讨论。';
-              return;
-            }
-            
-            moment.summaryLoading = true;
-            try {
-              // 获取 user_hash
-              const userHash = currentUser.value ? 
-                (currentUser.value.userId || currentUser.value.user_id || currentUser.value.userHash || currentUser.value.user_hash || currentUser.value.hash || currentUser.value.id || null) 
-                : null;
-              const summary = await getAnalysisSummary(videoId, offset, userHash);
-              moment.summary = summary;
-            } catch (err) {
-              console.error(`加载摘要失败 (offset: ${offset})`, err);
-              moment.summaryError = '加载失败';
-            } finally {
-              moment.summaryLoading = false;
-            }
-          });
+          void loadMomentSummariesSequentially(hotMoments.value, version)
         }
       } catch (e) {
         console.error('RecordingDetail getAnalysis error', e)
@@ -345,21 +391,80 @@ export default {
       }
     }
 
+    const fetchSubscriptions = async () => {
+      if (!currentUser.value) {
+        subscriptions.value = []
+        subscriptionsLoading.value = false
+        return
+      }
+
+      subscriptionsLoading.value = true
+      try {
+        const response = await fetch('/api/user/subscriptions')
+        if (!response.ok) {
+          throw new Error('获取订阅列表失败')
+        }
+        const data = await response.json()
+        subscriptions.value = data?.streamers || []
+      } catch (e) {
+        console.error('获取订阅主播列表失败:', e)
+        subscriptions.value = []
+      } finally {
+        subscriptionsLoading.value = false
+      }
+    }
+
+    const openStartExploreModal = () => {
+      if (!currentUser.value) {
+        error.value = '请先登录后使用订阅功能'
+        return
+      }
+      showStartExploreModal.value = true
+    }
+
+    const handleAddStreamer = async (streamerData) => {
+      try {
+        await subscribeStreamer(streamerData)
+        await fetchSubscriptions()
+        showStartExploreModal.value = false
+      } catch (e) {
+        console.error('添加主播失败:', e)
+        error.value = e.message || '添加主播失败，请稍后重试'
+      }
+    }
+
+    const handleLoginSuccess = () => {
+      fetchSubscriptions()
+    }
+
     onMounted(async () => {
       if (!videoId) {
         error.value = '缺少 video_id'
         loading.value = false
         return
       }
-       
-      await fetchAnalysisData()
+
+      await Promise.all([
+        fetchAnalysisData(),
+        fetchSubscriptions()
+      ])
       loading.value = false
-      
-      // 渲染时间序列折线图 - 必须在 loading 为 false 后才能渲染
+
       if (timeSeriesData.value.length > 0) {
-        await nextTick() // 等待 v-else 块渲染完成
+        await nextTick()
         await renderTimeSeriesChart()
       }
+
+      window.addEventListener('login-success', handleLoginSuccess)
+    })
+
+    onBeforeUnmount(() => {
+      summaryLoadVersion += 1
+      if (chartInstance) {
+        chartInstance.destroy()
+        chartInstance = null
+      }
+      window.removeEventListener('login-success', handleLoginSuccess)
     })
 
     return {
@@ -373,17 +478,54 @@ export default {
       analysisParams,
       refreshing,
       showAdvanced,
+      subscriptions,
+      subscriptionsLoading,
+      showStartExploreModal,
+      activeSubscriptionId,
       formatOffset,
       intervalRange,
       toggleExpand,
       refreshAnalysis,
-      router,
+      openStartExploreModal,
+      handleAddStreamer
     }
   }
 }
 </script>
 
 <style scoped>
+.recording-detail-page {
+  --sidebar-width: 280px;
+  --panel-height: 80vh;
+  --sidebar-height: var(--panel-height);
+  padding: 1rem;
+}
+
+.recording-layout {
+  max-width: 1300px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  gap: 1rem;
+}
+
+.content-panel {
+  background: var(--card, #fff);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  padding: 1.5rem;
+  height: var(--panel-height);
+  overflow-y: auto;
+}
+
+.page-title {
+  margin: 0.5rem 0 0;
+}
+
+.status-block {
+  margin-top: 1rem;
+}
+
 .meta-row {
   display: flex;
   gap: 12px;
@@ -713,6 +855,22 @@ export default {
 .slide-fade-leave-to {
   transform: translateY(-10px);
   opacity: 0;
+}
+
+@media (max-width: 1024px) {
+  .recording-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .recording-detail-page {
+    --panel-height: auto;
+    --sidebar-height: auto;
+  }
+
+  .content-panel {
+    height: auto;
+    overflow: visible;
+  }
 }
 
 </style>
