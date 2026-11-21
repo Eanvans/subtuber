@@ -143,10 +143,10 @@
       <Login v-if="loginOpened" ref="loginForm" title-id="workspace-login-title" @verified="onVerified" />
     </dialog>
 
-    <StartExploreModal
+    <AddStreamerModal
       v-if="showSubscribe"
       @close="showSubscribe = false"
-      @add-streamer="handleAddStreamer"
+      @subscribed="handleSubscriptionAdded"
     />
   </div>
 </template>
@@ -155,8 +155,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import Login from '../../shared-auth/Login.vue'
-import { subscribeStreamer } from './api/streamers'
-import StartExploreModal from './components/StartExploreModal.vue'
+import AddStreamerModal from './components/AddStreamerModal.vue'
 import SubscriptionSidebar from './components/SubscriptionSidebar.vue'
 import { useAuth } from './composables/useAuth'
 import { showNotification } from './utils/notification'
@@ -234,17 +233,9 @@ async function fetchSubscriptions() {
   }
 }
 
-async function handleAddStreamer(streamerData) {
-  const user = currentUser.value
-  try {
-    await subscribeStreamer(streamerData)
-    if (user === currentUser.value) {
-      showNotification('订阅已添加')
-      await fetchSubscriptions()
-    }
-  } catch (error) {
-    showNotification(error.message || '添加主播失败，请稍后重试')
-  }
+function handleSubscriptionAdded() {
+  showNotification('订阅已添加')
+  void fetchSubscriptions()
 }
 
 function onVerified(result) {

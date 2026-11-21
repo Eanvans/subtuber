@@ -30,11 +30,7 @@ apiClient.interceptors.response.use(
     return response.data
   },
   error => {
-    if (error.config?.url?.startsWith('/apikeys')) {
-      console.error('API Key request failed', error.response?.status || error.code)
-    } else {
-      console.error('API Error:', error)
-    }
+    console.error('API Error:', error)
     return Promise.reject(error)
   }
 )
@@ -112,28 +108,6 @@ export const api = {
     return apiClient.post('/admin/recharge-packages', data)
   },
   
-  // API Key 管理接口
-  createApiKey(data) {
-    return apiClient.post('/apikeys', data, { timeout: 15_000 })
-  },
-  getUserApiKeys(userHash) {
-    return apiClient.get(`/apikeys/user/${encodeURIComponent(userHash)}`, { timeout: 15_000 })
-  },
-  getApiKeysByProvider(userHash, provider) {
-    return apiClient.get(`/apikeys/user/${userHash}/provider/${provider}`)
-  },
-  getApiKeyById(id) {
-    return apiClient.get(`/apikeys/${id}`)
-  },
-  updateApiKey(id, data) {
-    return apiClient.put(`/apikeys/${id}`, data, { timeout: 15_000 })
-  },
-  deleteApiKey(id) {
-    return apiClient.delete(`/apikeys/${id}`, { timeout: 15_000 })
-  },
-  deleteAllUserApiKeys(userHash) {
-    return apiClient.delete(`/apikeys/user/${userHash}`)
-  },
   getUserProfileWithKeys(userHash) {
     return apiClient.get(`/user/${userHash}/profile`)
   }

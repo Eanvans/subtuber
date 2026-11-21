@@ -504,6 +504,27 @@ a { color: var(--accent); }
 
 .workspace-dialog-close:hover { background: var(--bg); }
 
+.workspace-dialog-content { padding: clamp(1rem, 4vw, 1.55rem); }
+.workspace-dialog-header { padding-right: 1.75rem; margin-bottom: 1.25rem; }
+.workspace-dialog-header h2 { margin: 0; font-size: 1.4rem; letter-spacing: -.025em; }
+.workspace-dialog-header p { margin: .38rem 0 0; color: var(--muted-2); font-size: .83rem; line-height: 1.6; overflow-wrap: anywhere; }
+.workspace-dialog-field { min-width: 0; display: grid; gap: .35rem; }
+.workspace-dialog-field label { color: var(--text); font-size: .82rem; font-weight: 650; }
+.workspace-dialog-field :is(input, select, textarea) {
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  padding: .48rem .65rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--text);
+  font: inherit;
+}
+.workspace-dialog-field input::placeholder { color: var(--muted-2); font-size: .82rem; }
+.workspace-dialog-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: .5rem; margin-top: 1.2rem; }
+.workspace-dialog-error { margin: .85rem 0 0; padding: .55rem .7rem; border-radius: 8px; background: #fceef0; color: #a82632; font-size: .82rem; }
+
 @media (max-width: 780px) {
   :root { --topbar-height: 58px; }
   .app-shell { display: block; }

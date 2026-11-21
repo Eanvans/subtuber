@@ -96,13 +96,14 @@ export async function getAnalysisSummary(videoId, offsetSeconds, userHash) {
   return data && data.summary ? data.summary : null;
 }
 
-export async function subscribeStreamer(streamerData) {
+export async function subscribeStreamer(streamerData, { signal } = {}) {
   const res = await fetch('/api/streamers/subscribe', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify(streamerData)
+    body: JSON.stringify(streamerData),
+    signal
   });
   
   if (!res.ok) {
@@ -154,7 +155,9 @@ async function requestJson(url, options = {}, defaultError = '请求失败') {
     } catch (e) {
       // ignore JSON parse errors and keep the default fallback
     }
-    throw new Error(message);
+    const error = new Error(message);
+    error.status = res.status;
+    throw error;
   }
   return res.headers.get('content-type')?.includes('application/json') ? res.json() : null;
 }

@@ -42,7 +42,7 @@
       <header class="market-header">
         <div>
           <h2 id="market-title">切片市场</h2>
-          <p>查看来自不同平台的报告摘要与高能片段。</p>
+          <p>浏览切片报告，使用积分解锁原视频和片段详情。</p>
         </div>
         <button type="button" class="btn btn-outline btn-sm" :disabled="marketLoading" @click="fetchMarketplace(page)">
           <i class="bi bi-arrow-clockwise" aria-hidden="true"></i> 刷新
@@ -97,19 +97,19 @@
     <dialog ref="reportDialog" class="report-dialog" aria-labelledby="report-title" @cancel="handleDialogCancel" @close="selectedReport = null">
       <template v-if="selectedReport">
         <header class="report-dialog-header">
-          <div>
-            <span class="platform-label" :data-platform="selectedReport.platform">{{ selectedReport.platform }}</span>
-            <h2 id="report-title">{{ selectedReport.title }}</h2>
+          <div class="report-dialog-identity">
+            <h2 id="report-title">报告摘要</h2>
+            <div class="report-dialog-streamer">
+              <ReportStreamer :name="selectedReport.streamer_name" :avatar-url="selectedReport.streamer_avatar_url" />
+              <span class="platform-label" :data-platform="selectedReport.platform">{{ selectedReport.platform }}</span>
+            </div>
           </div>
           <button type="button" class="dialog-close" aria-label="关闭报告" autofocus :disabled="reportBusy" @click="reportDialog.close()">×</button>
         </header>
         <div class="report-dialog-body" :aria-busy="reportBusy">
-          <section>
-            <h3>报告摘要</h3>
-            <p>{{ selectedReport.is_unlocked ? selectedReport.summary : selectedReport.preview_summary }}</p>
-          </section>
-          <section>
-            <h3>{{ selectedReport.is_unlocked ? '高能片段' : '片段预览' }}</h3>
+          <p>{{ selectedReport.is_unlocked ? selectedReport.summary : selectedReport.preview_summary }}</p>
+          <section v-if="selectedReport.is_unlocked">
+            <h3>高能片段</h3>
             <ul v-if="selectedReport.highlights.length" class="dialog-highlights">
               <li v-for="item in selectedReport.highlights" :key="item.id">
                 <time v-if="item.time">{{ item.time }}</time>
@@ -121,10 +121,29 @@
             </ul>
             <p v-else>暂无片段数据</p>
           </section>
+          <section v-else class="locked-report" aria-labelledby="locked-report-title">
+            <div class="locked-report-heading">
+              <span class="lock-icon"><i class="bi bi-lock" aria-hidden="true"></i></span>
+              <div>
+                <h3 id="locked-report-title">积分解锁完整报告</h3>
+                <p>一次解锁，永久查看。</p>
+              </div>
+              <div class="unlock-cost">
+                <template v-if="displayedUnlockPrice !== null">
+                  <strong>{{ formatCount(displayedUnlockPrice) }}</strong> 积分
+                </template>
+                <span v-else>以报价为准</span>
+              </div>
+            </div>
+            <ul class="locked-benefits">
+              <li><i class="bi bi-play-btn" aria-hidden="true"></i> 原视频链接</li>
+              <li><i class="bi bi-clock-history" aria-hidden="true"></i> 高能片段与时间戳</li>
+            </ul>
+          </section>
           <p v-if="reportMessage" class="dialog-status" role="status">{{ reportMessage }}</p>
         </div>
         <footer class="report-dialog-footer">
-          <a v-if="selectedReport.source_link" :href="selectedReport.source_link" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-sm">
+          <a v-if="selectedReport.is_unlocked && selectedReport.source_link" :href="selectedReport.source_link" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-sm">
             查看原视频 <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i>
           </a>
           <div class="dialog-actions">
@@ -132,11 +151,11 @@
             <span v-else-if="selectedReport.is_unlocked" class="unlocked-label"><i class="bi bi-check-circle" aria-hidden="true"></i> 已解锁</span>
             <template v-else-if="unlockPrice !== null">
               <button type="button" class="btn btn-outline btn-sm" @click="cancelUnlock">取消</button>
-              <button type="button" class="btn btn-primary btn-sm" @click="confirmUnlock">确认解锁 · {{ formatCount(unlockPrice) }} 积分</button>
+              <button type="button" class="btn btn-primary btn-sm" @click="confirmUnlock">确认支付 {{ formatCount(unlockPrice) }} 积分</button>
             </template>
             <button v-else-if="needsDetail" type="button" class="btn btn-outline btn-sm" @click="loadReportDetail">重新获取报告</button>
             <button v-else type="button" class="btn btn-primary btn-sm" @click="requestUnlock">
-              {{ currentUser ? '解锁完整报告' : '登录后解锁' }}
+              {{ currentUser ? '使用积分解锁' : '登录后解锁' }}
             </button>
           </div>
         </footer>
@@ -149,6 +168,7 @@
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { getClipReportDetail, getClipReportUnlockQuote, getClipReportsMarketplace, unlockClipReport } from '../api/streamers'
 import ClipReportCard from '../components/ClipReportCard.vue'
+import ReportStreamer from '../components/ReportStreamer.vue'
 import { useAuth } from '../composables/useAuth'
 import { showNotification } from '../utils/notification'
 import { formatPlatformName } from '../utils/platform'
@@ -175,13 +195,14 @@ let marketRequest = 0
 const numberFormat = new Intl.NumberFormat('zh-CN')
 
 const pageCount = computed(() => Math.max(1, Math.ceil(totalReports.value / pageSize)))
-const pageHighlights = computed(() => marketReports.value.reduce((count, report) => count + report.highlights.length, 0))
+const pageHighlights = computed(() => marketReports.value.reduce((count, report) => count + report.highlight_count, 0))
+const displayedUnlockPrice = computed(() => unlockPrice.value ?? selectedReport.value?.unlock_cost ?? null)
 const platforms = computed(() => [...new Set(marketReports.value.map(report => report.platform))].sort())
 const visibleReports = computed(() => {
   const query = search.value.toLocaleLowerCase()
   return marketReports.value.filter(report => {
     if (platform.value && report.platform !== platform.value) return false
-    return [report.title, report.source_video_id, report.preview_summary, report.platform]
+    return [report.title, report.streamer_name, report.source_video_id, report.preview_summary, report.platform]
       .some(value => String(value || '').toLocaleLowerCase().includes(query))
   })
 })
@@ -210,32 +231,39 @@ function sourceLink(value) {
 }
 
 function normalizeReport(report, fallback = {}) {
-  const id = report.id || report.report_id || fallback.id || report.source_video_id || report.video_id
-  const videoId = report.source_video_id || report.video_id || fallback.source_video_id
-  const isUnlocked = Boolean(report.is_unlocked || report.unlocked)
-  const items = isUnlocked ? report.highlights : report.preview_highlights ?? report.highlights
-  const preview = report.preview_summary || report.spoiler_free_summary || report.summary || fallback.preview_summary || '暂无报告摘要'
+  const id = report.id || report.report_id || fallback.id
+  const isUnlocked = report.is_unlocked === true || report.unlocked === true
+  const items = Array.isArray(report.highlights) ? report.highlights : []
+  const previewItems = Array.isArray(report.preview_highlights) ? report.preview_highlights : []
+  const count = report.highlight_count ?? (items.length || previewItems.length || fallback.highlight_count || 0)
+  // Older responses may contain the source video ID and exact times in their summary.
+  const publicSummary = report.highlight_count != null ? report.spoiler_free_summary : ''
+  const preview = publicSummary || (count > 0 ? `本报告收录 ${count} 个片段，含片段说明和时间戳。` : '查看完整报告，了解直播内容。')
+  const price = Number(report.unlock_cost ?? report.unlock_price_points ?? report.price ?? fallback.unlock_cost)
   return {
     id,
-    source_video_id: videoId,
-    source_link: sourceLink(report.source_url) || fallback.source_link,
-    title: report.title || fallback.title || (videoId ? `视频 ${videoId}` : `切片报告 #${id}`),
+    source_video_id: isUnlocked ? report.source_video_id || report.video_id : undefined,
+    source_link: isUnlocked ? sourceLink(report.source_url) : '',
+    title: `切片报告 #${id}`,
+    streamer_name: report.streamer_name || fallback.streamer_name || '',
+    streamer_avatar_url: sourceLink(report.streamer_avatar_url) || fallback.streamer_avatar_url || '',
     platform: formatPlatformName(report.source_platform || report.platform || fallback.platform),
     date: report.completed_at || report.created_at || fallback.date,
-    summary: report.summary || report.spoiler_free_summary || preview,
+    summary: isUnlocked ? report.summary || report.spoiler_free_summary || '暂无报告摘要' : preview,
     preview_summary: preview,
-    unlock_cost: Number(report.unlock_cost ?? report.unlock_price_points ?? report.price ?? fallback.unlock_cost ?? 0),
+    unlock_cost: Number.isSafeInteger(price) && price > 0 ? price : null,
     is_unlocked: isUnlocked,
-    highlights: (Array.isArray(items) ? items : []).map((item, index) => {
+    highlight_count: count,
+    highlights: isUnlocked ? items.map((item, index) => {
       const start = formatTime(item.start_seconds)
       const end = formatTime(item.end_seconds)
       return {
         id: item.id || index,
         label: item.label || item.title || item.summary || '高能片段',
         summary: item.summary || item.description || '',
-        time: isUnlocked ? item.time || (start && end ? `${start} – ${end}` : start) : ''
+        time: item.time || (start && end ? `${start} – ${end}` : start)
       }
-    })
+    }) : []
   }
 }
 
@@ -342,8 +370,11 @@ async function requestUnlock() {
       needsDetail.value = false
       return
     }
-    unlockPrice.value = Number(quote?.unlock_price_points ?? quote?.unlock_cost ?? quote?.price ?? quote?.amount ?? selectedReport.value.unlock_cost)
-    reportMessage.value = '确认后扣除积分，完整时间戳将永久可见。'
+    const price = Number(quote?.unlock_price_points ?? quote?.unlock_cost ?? quote?.price ?? quote?.amount)
+    if (!Number.isSafeInteger(price) || price <= 0) throw new Error('暂时无法获取解锁价格，请重试。')
+    selectedReport.value = { ...selectedReport.value, unlock_cost: price }
+    unlockPrice.value = price
+    reportMessage.value = '确认支付后，将从你的账户扣除上方显示的积分。'
   } catch (error) {
     reportMessage.value = error.message || '暂时无法获取解锁价格，请重试。'
   } finally {
@@ -361,7 +392,11 @@ async function confirmUnlock() {
   reportBusy.value = true
   reportMessage.value = ''
   try {
-    await unlockClipReport(selectedReport.value.id, { confirm: true })
+    const result = await unlockClipReport(selectedReport.value.id, {
+      confirm: true,
+      expected_price_points: unlockPrice.value
+    })
+    if (!result?.success) throw new Error('解锁失败，请稍后重试。')
     unlockPrice.value = null
     needsDetail.value = true
     const detail = await fetchSelectedDetail()
@@ -369,6 +404,10 @@ async function confirmUnlock() {
     needsDetail.value = false
     showNotification('报告已解锁')
   } catch (error) {
+    if (error.status === 409) {
+      unlockPrice.value = null
+      if (selectedReport.value) selectedReport.value = { ...selectedReport.value, unlock_cost: null }
+    }
     reportMessage.value = needsDetail.value ? '报告已解锁，请重新获取详情。' : error.message || '解锁失败，请稍后重试。'
   } finally {
     reportBusy.value = false
@@ -532,13 +571,26 @@ onMounted(() => fetchMarketplace(1))
 }
 
 .report-dialog-header { align-items: flex-start; border-bottom: 1px solid var(--border); }
-.report-dialog-header h2 { margin: .38rem 0 0; font-size: 1.28rem; overflow-wrap: anywhere; }
+.report-dialog-identity { min-width: 0; }
+.report-dialog-header h2 { margin: 0; font-size: 1.28rem; }
+.report-dialog-streamer { --report-avatar-size: 34px; display: flex; align-items: center; gap: .6rem; margin-top: .55rem; }
+.report-dialog-streamer .platform-label { flex-shrink: 0; }
 .report-dialog-footer { align-items: center; flex-wrap: wrap; border-top: 1px solid var(--border); }
 .dialog-actions { margin-left: auto; }
 .dialog-close { border: 0; background: transparent; color: var(--muted); font-size: 1.45rem; cursor: pointer; }
 .report-dialog-body { overflow-y: auto; display: grid; gap: 1.15rem; padding: 1rem 1.25rem; }
 .report-dialog-body h3 { margin: 0 0 .4rem; font-size: .92rem; }
 .report-dialog-body p { margin: 0; color: var(--muted); font-size: .85rem; line-height: 1.65; overflow-wrap: anywhere; }
+.report-dialog-body > p { white-space: pre-line; }
+.locked-report { padding: .95rem; border: 1px solid #dcdffc; border-radius: 10px; background: #f5f6ff; }
+.locked-report-heading { display: flex; align-items: center; flex-wrap: wrap; gap: .65rem; }
+.lock-icon { display: grid; flex: 0 0 38px; height: 38px; place-items: center; border-radius: 8px; color: var(--accent); background: #e7e9ff; }
+.locked-report-heading h3 { margin: 0; }
+.locked-report-heading p { margin-top: .15rem; color: var(--muted-2); font-size: .77rem; }
+.unlock-cost { margin-left: auto; color: var(--accent); font-size: .8rem; font-weight: 650; white-space: nowrap; }
+.unlock-cost strong { font-size: 1.4rem; font-variant-numeric: tabular-nums; }
+.locked-benefits { display: flex; flex-wrap: wrap; gap: .45rem 1rem; margin: .75rem 0 0; padding: .65rem 0 0; border-top: 1px solid #dcdffc; list-style: none; color: var(--muted); font-size: .78rem; }
+.locked-benefits i { margin-right: .18rem; color: var(--accent); }
 .dialog-highlights { display: grid; gap: .5rem; padding: 0; margin: 0; list-style: none; }
 .dialog-highlights li { display: flex; flex-wrap: wrap; gap: .35rem .65rem; padding: .55rem .65rem; background: var(--bg); border-radius: 7px; font-size: .85rem; }
 .dialog-highlights time { font-variant-numeric: tabular-nums; color: var(--accent); font-weight: 650; }
