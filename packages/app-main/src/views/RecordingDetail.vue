@@ -32,7 +32,8 @@
         </div>
         <div class="chart-legend" aria-hidden="true">
           <span><span class="legend-line"></span> 互动得分</span>
-          <span><span class="legend-peak"></span> 热度峰值</span>
+          <span><span class="legend-peak"></span> 高能片段</span>
+          <span><span class="legend-local-peak"></span> 热度峰值</span>
         </div>
         <div v-show="timeSeriesData.length" class="chart-container">
           <canvas ref="chartCanvas" role="img" aria-label="直播互动得分随回放时间变化的折线图"></canvas>
@@ -51,7 +52,7 @@
         <ol v-else class="moments-list">
           <li v-for="(moment, index) in hotMoments" :key="index" class="moment">
             <div class="moment-meta">
-              <span v-if="markerAssignmentReady && moment.markerNo != null" class="moment-index">{{ moment.markerNo }}</span>
+              <span class="moment-index">{{ moment.markerNo }}</span>
               <div>
                 <div class="moment-time">{{ intervalRange(moment) }}</div>
                 <span class="moment-score">互动得分 <strong>{{ moment.comments_score ?? '—' }}</strong></span>
@@ -172,8 +173,6 @@ export default {
     const analysis = ref({})
     const hotMoments = ref([])
     const timeSeriesData = ref([])
-    const peakMarkerByIndex = ref({})
-    const markerAssignmentReady = ref(false)
     const chartCanvas = ref(null)
     const seriesLoading = ref(false)
     const seriesError = ref('')
@@ -193,59 +192,39 @@ export default {
       return ''
     })
 
-    const buildHotMomentsWithState = (moments) => {
-      return (moments || []).map((moment) => ({
-        ...moment,
-        markerNo: null,
-        summaryLoading: false,
-        summaryError: null,
-        summary: null,
-        expanded: false
-      }))
-    }
-
     const getOffsetSeconds = (item) => {
       const offset = item?.offset_seconds ?? item?.offset
-      return Number.isFinite(Number(offset)) ? Number(offset) : 0
+      if (offset == null || offset === '') return null
+      const seconds = Number(offset)
+      return Number.isFinite(seconds) && seconds >= 0 ? seconds : null
     }
 
-    const assignMarkerNumbersAfterSeriesLoaded = (series, moments) => {
-      const peakIndices = []
-      for (let i = 0; i < series.length; i += 1) {
-        if (series[i]?.is_peak) peakIndices.push(i)
+    const buildHotMomentsWithState = (moments) => {
+      return [...(moments || [])]
+        .sort((a, b) => (getOffsetSeconds(a) ?? Infinity) - (getOffsetSeconds(b) ?? Infinity))
+        .map((moment, index) => ({
+          ...moment,
+          markerNo: index + 1,
+          summaryLoading: false,
+          summaryError: null,
+          summary: null,
+          expanded: false
+        }))
+    }
+
+    const getMomentMarkers = (series, moments) => {
+      const numberByOffset = new Map()
+      for (const moment of moments) {
+        const offset = getOffsetSeconds(moment)
+        if (offset !== null) numberByOffset.set(offset, moment.markerNo)
       }
 
-      const candidates = (moments || []).map((moment) => ({
-        moment,
-        offset: getOffsetSeconds(moment)
-      }))
-      const usedCandidateIndexes = new Set()
-      const markerByPeakIndex = {}
-      let markerNo = 0
-
-      for (const peakIndex of peakIndices) {
-        const peakOffset = getOffsetSeconds(series[peakIndex])
-        let bestCandidateIndex = -1
-        let bestDiff = Number.POSITIVE_INFINITY
-
-        for (let i = 0; i < candidates.length; i += 1) {
-          if (usedCandidateIndexes.has(i)) continue
-          const diff = Math.abs(candidates[i].offset - peakOffset)
-          if (diff < bestDiff) {
-            bestDiff = diff
-            bestCandidateIndex = i
-          }
-        }
-
-        if (bestCandidateIndex >= 0) {
-          usedCandidateIndexes.add(bestCandidateIndex)
-          markerNo += 1
-          markerByPeakIndex[peakIndex] = markerNo
-          candidates[bestCandidateIndex].moment.markerNo = markerNo
-        }
-      }
-
-      return markerByPeakIndex
+      const markerByIndex = new Map()
+      series.forEach((point, index) => {
+        const offset = getOffsetSeconds(point)
+        if (numberByOffset.has(offset)) markerByIndex.set(index, numberByOffset.get(offset))
+      })
+      return markerByIndex
     }
 
     const loadMomentSummariesSequentially = async (moments, version) => {
@@ -325,16 +304,22 @@ export default {
       moment.expanded = !moment.expanded
     }
 
-    const renderTimeSeriesChart = async () => {
+    const renderTimeSeriesChart = () => {
       const canvas = chartCanvas.value
       if (!canvas || timeSeriesData.value.length === 0) return
 
       const series = timeSeriesData.value
-      const labels = series.map((p) => p.formatted_time || formatOffset(p.offset_seconds))
+      const labels = series.map((p) => p.formatted_time || formatOffset(getOffsetSeconds(p)))
       const values = series.map((p) => p.score ?? 0)
-      const pointBg = series.map((p) => p.is_peak ? '#bd501b' : '#4b4fcb')
-      const pointRadii = series.map((p) => p.is_peak ? 4 : 0)
-      const markerByPeakIndex = peakMarkerByIndex.value
+      // Adjacent samples on a flat peak can all be flagged by the API.
+      // Number the merged moments at their timestamps, including on a curve drawn with custom parameters.
+      const markerByIndex = getMomentMarkers(series, hotMoments.value)
+      const momentColor = '#bd501b'
+      const pointBg = series.map((_, index) => markerByIndex.has(index) ? momentColor : '#a4a7e6')
+      const pointRadii = series.map((point, index) => {
+        if (markerByIndex.has(index)) return 4
+        return point.is_peak ? 2 : 0
+      })
 
       if (chartInstance) {
         chartInstance.destroy()
@@ -351,19 +336,19 @@ export default {
           chartCtx.font = '700 12px system-ui, -apple-system, Segoe UI, sans-serif'
           chartCtx.textAlign = 'center'
           chartCtx.textBaseline = 'bottom'
+          chartCtx.strokeStyle = '#ffffff'
+          chartCtx.lineWidth = 3
 
-          for (let i = 0; i < datasetMeta.data.length; i += 1) {
-            if (!markerAssignmentReady.value) break
-            const markerNo = markerByPeakIndex[i]
-            if (!markerNo) continue
-            const point = datasetMeta.data[i]
-            const x = point.x
-            const y = point.y - 10
-            chartCtx.strokeStyle = '#ffffff'
-            chartCtx.lineWidth = 3
-            chartCtx.strokeText(String(markerNo), x, y)
+          for (const [index, number] of markerByIndex) {
+            const { x, y, skip } = datasetMeta.data[index]
+            if (skip) continue
+            chartCtx.fillStyle = momentColor
+            chartCtx.beginPath()
+            chartCtx.arc(x, y, 4, 0, Math.PI * 2)
+            chartCtx.fill()
             chartCtx.fillStyle = '#97421b'
-            chartCtx.fillText(String(markerNo), x, y)
+            chartCtx.strokeText(String(number), x, y - 10)
+            chartCtx.fillText(String(number), x, y - 10)
           }
           chartCtx.restore()
         }
@@ -390,6 +375,7 @@ export default {
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          layout: { padding: { top: 16 } },
           scales: {
             x: {
               type: 'category',
@@ -419,6 +405,8 @@ export default {
                 label: (ctx) => {
                   const v = ctx.parsed.y
                   const idx = ctx.dataIndex
+                  const marker = markerByIndex.get(idx)
+                  if (marker !== undefined) return `互动得分 ${v} · 高能片段 ${marker}`
                   const peak = series[idx] && series[idx].is_peak ? ' · 热度峰值' : ''
                   return `互动得分 ${v}${peak}`
                 }
@@ -458,11 +446,9 @@ export default {
 
         if (version !== summaryLoadVersion) return
         timeSeriesData.value = mergedSeries
-        peakMarkerByIndex.value = assignMarkerNumbersAfterSeriesLoaded(mergedSeries, hotMoments.value)
-        markerAssignmentReady.value = true
         if (timeSeriesData.value.length > 0) {
           await nextTick()
-          if (version === summaryLoadVersion) await renderTimeSeriesChart()
+          if (version === summaryLoadVersion) renderTimeSeriesChart()
         }
       } catch (seriesErr) {
         if (version !== summaryLoadVersion) return
@@ -492,8 +478,6 @@ export default {
 
         analysis.value = data || {}
         hotMoments.value = buildHotMomentsWithState((data && data.hot_moments) ? data.hot_moments : [])
-        markerAssignmentReady.value = false
-        peakMarkerByIndex.value = {}
         timeSeriesData.value = []
         seriesError.value = ''
         seriesLoading.value = true
@@ -560,7 +544,6 @@ export default {
       refreshing,
       showAdvanced,
       vodExternalUrl,
-      markerAssignmentReady,
       chartCanvas,
       seriesLoading,
       seriesError,
@@ -595,6 +578,7 @@ export default {
 .chart-legend > span { display: inline-flex; align-items: center; gap: .4rem; }
 .legend-line { width: 18px; height: 2px; border-radius: 2px; background: var(--accent); }
 .legend-peak { width: 8px; height: 8px; border-radius: 50%; background: #bd501b; }
+.legend-local-peak { width: 6px; height: 6px; border-radius: 50%; background: #a4a7e6; }
 .chart-container { position: relative; height: clamp(225px, 26vw, 340px); }
 .chart-state { min-height: 180px; display: grid; place-items: center; color: var(--muted-2); font-size: .85rem; }
 .hot-moments .analysis-header { padding: 1rem 1.25rem; }
