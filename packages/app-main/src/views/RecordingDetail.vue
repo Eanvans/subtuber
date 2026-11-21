@@ -1,84 +1,89 @@
 <template>
-  <div class="recording-detail-page">
-    <div class="recording-layout">
-      <SubscriptionSidebar
-        title="我的订阅"
-        :items="subscriptions"
-        :loading="subscriptionsLoading"
-        empty-text="暂时还没有订阅主播"
-        :active-id="activeSubscriptionId"
-        :show-add-button="true"
-        @add-click="openStartExploreModal"
-      />
+  <main class="workspace-width workspace-page">
+    <header class="page-header">
+      <div>
+        <h1>回放热度分析</h1>
+        <div class="recording-meta">
+          <span v-if="analysis.streamer_name">{{ analysis.streamer_name }}</span>
+          <span class="platform-label" :data-platform="platformLabel">{{ platformLabel }}</span>
+          <span class="video-id">视频 {{ analysis.video_id || videoId }}</span>
+        </div>
+      </div>
+      <a v-if="vodExternalUrl" :href="vodExternalUrl" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-sm">
+        查看原视频 <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i>
+      </a>
+    </header>
 
-      <section ref="contentPanelRef" class="content-panel" @scroll="handleContentScroll">
-        <div v-if="loading" class="status-block">加载中…</div>
-        <div v-else-if="error" class="status-block error">{{ error }}</div>
-        <div v-else>
-          <div class="meta-row">
-            <div>
-              <strong>VOD ID:</strong>
-              <a
-                v-if="vodExternalUrl"
-                :href="vodExternalUrl"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="vod-link"
-              >
-                {{ analysis.video_id || videoId }}
-              </a>
-              <span v-else>{{ analysis.video_id || videoId }}</span>
-            </div>
-            <div><strong>主播:</strong> {{ analysis.streamer_name || '-' }}</div>
+    <div v-if="loading" class="surface analysis-state" role="status">正在加载回放分析…</div>
+    <div v-else-if="error" class="surface analysis-state" role="status">
+      <p>{{ error }}</p>
+      <button type="button" class="btn btn-outline btn-sm" :disabled="refreshing" @click="refreshAnalysis">重新加载</button>
+    </div>
+    <template v-else>
+      <section class="surface time-series-chart" aria-labelledby="trend-title">
+        <div class="analysis-header">
+          <div>
+            <h2 id="trend-title">直播热度趋势</h2>
+            <p>按回放时间查看互动得分，编号对应下方的高能片段。</p>
           </div>
-
-          <section class="time-series-chart" :style="timeSeriesChartStyle">
-            <div class="chart-header">
-              <h3>直播热度趋势</h3>
-              <button class="btn-advanced" @click="showAdvanced = true">高级参数调节</button>
-            </div>
-            <div class="chart-container">
-              <canvas id="timeSeriesChart" style="width:100%; height:100%"></canvas>
-            </div>
-          </section>
-
-          <section class="hot-moments">
-            <div v-if="!hotMoments.length">没有可展示的片段。</div>
-            <div class="moments-list">
-              <div v-for="(m, idx) in hotMoments" :key="idx" class="moment">
-                <div class="moment-left">
-                  <div class="time">
-                    <span v-if="markerAssignmentReady && m.markerNo != null" class="moment-index">{{ m.markerNo }}.</span>
-                    {{ intervalRange(m) }}
-                  </div>
-                  <!-- <div class="interval">{{ m.time_interval || '' }}</div> -->
-                  <div><strong>得分:</strong> {{ m.comments_score }}</div>
-                </div>
-                <div class="moment-right">
-                  <div
-                    class="moment-preview"
-                    :class="{ loading: m.summaryLoading, expanded: m.expanded, clickable: m.summary && !m.summaryLoading }"
-                    @click="m.summary && !m.summaryLoading && toggleExpand(m)"
-                  >
-                    <div v-if="m.summaryLoading" class="loading-text">加载分析中...</div>
-                    <div v-else-if="m.summaryError" class="error-text">{{ m.summaryError }}</div>
-                    <div v-else-if="m.summary" class="summary-text">{{ m.summary }}</div>
-                    <div v-else class="placeholder-text">内容占位：AI 分析输出将显示在这里（占位灰色框）</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
+          <button type="button" class="btn btn-outline btn-sm" @click="showAdvanced = true">
+            <i class="bi bi-sliders" aria-hidden="true"></i> 分析参数
+          </button>
+        </div>
+        <div class="chart-legend" aria-hidden="true">
+          <span><span class="legend-line"></span> 互动得分</span>
+          <span><span class="legend-peak"></span> 热度峰值</span>
+        </div>
+        <div v-show="timeSeriesData.length" class="chart-container">
+          <canvas ref="chartCanvas" role="img" aria-label="直播互动得分随回放时间变化的折线图"></canvas>
+        </div>
+        <div v-if="!timeSeriesData.length" class="chart-state" role="status">
+          {{ seriesLoading ? '正在加载热度数据…' : seriesError || '暂无热度数据' }}
         </div>
       </section>
-    </div>
+
+      <section class="surface hot-moments" aria-labelledby="moments-title">
+        <div class="analysis-header">
+          <h2 id="moments-title">高能片段</h2>
+          <span class="moment-count">{{ hotMoments.length }} 个片段</span>
+        </div>
+        <div v-if="!hotMoments.length" class="analysis-state">暂无高能片段</div>
+        <ol v-else class="moments-list">
+          <li v-for="(moment, index) in hotMoments" :key="index" class="moment">
+            <div class="moment-meta">
+              <span v-if="markerAssignmentReady && moment.markerNo != null" class="moment-index">{{ moment.markerNo }}</span>
+              <div>
+                <div class="moment-time">{{ intervalRange(moment) }}</div>
+                <span class="moment-score">互动得分 <strong>{{ moment.comments_score ?? '—' }}</strong></span>
+              </div>
+            </div>
+            <div class="moment-summary">
+              <p v-if="moment.summaryLoading" role="status">正在加载摘要…</p>
+              <p v-else-if="moment.summaryError">{{ moment.summaryError }}</p>
+              <template v-else-if="moment.summary">
+                <p class="summary-text" :class="{ collapsed: moment.summary.length > 90 && !moment.expanded }" :id="`moment-summary-${index}`">{{ moment.summary }}</p>
+                <button
+                  v-if="moment.summary.length > 90"
+                  type="button"
+                  class="summary-toggle"
+                  :aria-expanded="moment.expanded"
+                  :aria-controls="`moment-summary-${index}`"
+                  @click="toggleExpand(moment)"
+                >{{ moment.expanded ? '收起摘要' : '展开摘要' }}</button>
+              </template>
+              <p v-else>暂无片段摘要</p>
+            </div>
+          </li>
+        </ol>
+      </section>
+    </template>
 
     <transition name="slide-fade">
       <div v-if="showAdvanced" class="advanced-modal-overlay" @click.self="showAdvanced = false">
-        <div class="advanced-modal-card">
+        <div class="advanced-modal-card" role="dialog" aria-modal="true" aria-labelledby="advanced-title" @keydown.esc="showAdvanced = false">
           <div class="advanced-modal-header">
-            <h4>高级参数调节</h4>
-            <button class="modal-close" @click="showAdvanced = false">×</button>
+            <h4 id="advanced-title">分析参数</h4>
+            <button type="button" class="modal-close" aria-label="关闭分析参数" @click="showAdvanced = false">×</button>
           </div>
           <div class="advanced-modal-body">
             <div class="params-grid">
@@ -90,6 +95,7 @@
                 <input
                   v-model.number="analysisParams.windows_len"
                   type="range"
+                  aria-label="窗口长度（秒）"
                   min="60"
                   max="600"
                   step="10"
@@ -105,6 +111,7 @@
                 <input
                   v-model.number="analysisParams.thr"
                   type="range"
+                  aria-label="阈值"
                   min="0.5"
                   max="1.0"
                   step="0.01"
@@ -120,6 +127,7 @@
                 <input
                   v-model.number="analysisParams.search_range"
                   type="range"
+                  aria-label="搜索范围（秒）"
                   min="30"
                   max="300"
                   step="5"
@@ -137,29 +145,19 @@
       </div>
     </transition>
 
-    <StartExploreModal
-      v-if="showStartExploreModal"
-      @close="showStartExploreModal = false"
-      @add-streamer="handleAddStreamer"
-    />
-  </div>
+  </main>
 </template>
 
 <script>
 import { ref, onMounted, onBeforeUnmount, nextTick, computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { getAnalysis, getAnalysisSummary, subscribeStreamer } from '../api/streamers'
+import { getAnalysis, getAnalysisSummary } from '../api/streamers'
 import { useAuth } from '../composables/useAuth'
-import StartExploreModal from '../components/StartExploreModal.vue'
-import SubscriptionSidebar from '../components/SubscriptionSidebar.vue'
+import { formatPlatformName } from '../utils/platform'
 import Chart from 'chart.js/auto'
 
 export default {
   name: 'RecordingDetail',
-  components: {
-    StartExploreModal,
-    SubscriptionSidebar
-  },
   setup() {
     const TIME_SERIES_PAGE_SIZE = 1200
     const MAX_TIME_SERIES_PAGES = 200
@@ -176,39 +174,24 @@ export default {
     const timeSeriesData = ref([])
     const peakMarkerByIndex = ref({})
     const markerAssignmentReady = ref(false)
-    const contentPanelRef = ref(null)
-    const chartScale = ref(1)
+    const chartCanvas = ref(null)
+    const seriesLoading = ref(false)
+    const seriesError = ref('')
     const refreshing = ref(false)
     const showAdvanced = ref(false)
-    const subscriptions = ref([])
-    const subscriptionsLoading = ref(false)
-    const showStartExploreModal = ref(false)
     const analysisParams = ref({
       windows_len: 420,
       thr: 0.90,
       search_range: 210
     })
-    const activeSubscriptionId = computed(() => {
-      const byQuery = String(route.query.streamer_id || '')
-      if (byQuery) return byQuery
-      const byAnalysis = analysis.value?.streamer_id || analysis.value?.streamer_login || ''
-      return byAnalysis ? String(byAnalysis) : ''
-    })
+    const platformLabel = computed(() => formatPlatformName(platform.value || analysis.value.platform || 'twitch'))
     const vodExternalUrl = computed(() => {
       const id = String(analysis.value?.video_id || videoId || '').trim()
       if (!id) return ''
-      return `https://www.twitch.tv/videos/${encodeURIComponent(id)}`
+      if (platformLabel.value === 'YouTube') return `https://www.youtube.com/watch?v=${encodeURIComponent(id)}`
+      if (platformLabel.value === 'Twitch') return `https://www.twitch.tv/videos/${encodeURIComponent(id)}`
+      return ''
     })
-    const timeSeriesChartStyle = computed(() => ({
-      transform: `scale(${chartScale.value})`
-    }))
-
-    const handleContentScroll = () => {
-      const scroller = contentPanelRef.value
-      if (!scroller) return
-      const progress = Math.min(1, Math.max(0, scroller.scrollTop / 420))
-      chartScale.value = 1 - progress * 0.5
-    }
 
     const buildHotMomentsWithState = (moments) => {
       return (moments || []).map((moment) => ({
@@ -275,7 +258,7 @@ export default {
         if (version !== summaryLoadVersion) return
 
         if (isYoutube) {
-          moment.summary = 'YouTube总结因为Youtube的下载不稳定，暂时没有很好的解决方案，欢迎大佬加群交流和讨论。'
+          moment.summary = 'YouTube 回放的摘要暂不可用。'
           continue
         }
 
@@ -288,7 +271,7 @@ export default {
         } catch (err) {
           if (version !== summaryLoadVersion) return
           console.error(`加载摘要失败 (offset: ${offset})`, err)
-          moment.summaryError = '加载失败'
+          moment.summaryError = '片段摘要加载失败'
         } finally {
           if (version === summaryLoadVersion) {
             moment.summaryLoading = false
@@ -343,14 +326,14 @@ export default {
     }
 
     const renderTimeSeriesChart = async () => {
-      const canvas = document.getElementById('timeSeriesChart')
+      const canvas = chartCanvas.value
       if (!canvas || timeSeriesData.value.length === 0) return
 
       const series = timeSeriesData.value
       const labels = series.map((p) => p.formatted_time || formatOffset(p.offset_seconds))
       const values = series.map((p) => p.score ?? 0)
-      const pointBg = series.map((p) => p.is_peak ? '#ef4444' : '#3b82f6')
-      const pointRadii = series.map((p) => p.is_peak ? 6 : 2)
+      const pointBg = series.map((p) => p.is_peak ? '#bd501b' : '#4b4fcb')
+      const pointRadii = series.map((p) => p.is_peak ? 4 : 0)
       const markerByPeakIndex = peakMarkerByIndex.value
 
       if (chartInstance) {
@@ -358,10 +341,6 @@ export default {
       }
 
       const ctx = canvas.getContext('2d')
-      const canvasWidth = canvas.clientWidth || 800
-      const approxLabelWidth = 100
-      const maxTicksLimit = Math.max(2, Math.floor(canvasWidth / approxLabelWidth))
-      const step = Math.max(1, Math.ceil(labels.length / maxTicksLimit))
       const peakMarkerNumberPlugin = {
         id: 'peakMarkerNumber',
         afterDatasetsDraw(chart) {
@@ -383,7 +362,7 @@ export default {
             chartCtx.strokeStyle = '#ffffff'
             chartCtx.lineWidth = 3
             chartCtx.strokeText(String(markerNo), x, y)
-            chartCtx.fillStyle = '#dc2626'
+            chartCtx.fillStyle = '#97421b'
             chartCtx.fillText(String(markerNo), x, y)
           }
           chartCtx.restore()
@@ -396,10 +375,11 @@ export default {
         data: {
           labels,
           datasets: [{
-            label: 'Score',
+            label: '互动得分',
             data: values,
-            borderColor: '#3b82f6',
-            backgroundColor: 'rgba(59,130,246,0.08)',
+            borderColor: '#4b4fcb',
+            borderWidth: 2,
+            backgroundColor: 'rgba(75, 79, 203, .09)',
             tension: 0.3,
             pointRadius: pointRadii,
             pointBackgroundColor: pointBg,
@@ -415,17 +395,18 @@ export default {
               type: 'category',
               ticks: {
                 maxRotation: 0,
-                autoSkip: false,
-                callback: function(val, idx) {
-                  return (idx % step === 0) ? (labels[idx] || '') : ''
-                },
-                font: { size: 12 },
+                autoSkip: true,
+                autoSkipPadding: 20,
+                color: '#5c6b82',
+                font: { size: 11 },
                 padding: 6,
               },
               grid: { display: false },
             },
             y: {
               beginAtZero: true,
+              ticks: { color: '#5c6b82', precision: 0 },
+              grid: { color: '#e9edf5' },
             },
           },
           plugins: {
@@ -438,8 +419,8 @@ export default {
                 label: (ctx) => {
                   const v = ctx.parsed.y
                   const idx = ctx.dataIndex
-                  const peak = series[idx] && series[idx].is_peak ? ' (peak)' : ''
-                  return `Score: ${v}${peak}`
+                  const peak = series[idx] && series[idx].is_peak ? ' · 热度峰值' : ''
+                  return `互动得分 ${v}${peak}`
                 }
               }
             },
@@ -481,11 +462,15 @@ export default {
         markerAssignmentReady.value = true
         if (timeSeriesData.value.length > 0) {
           await nextTick()
-          await renderTimeSeriesChart()
+          if (version === summaryLoadVersion) await renderTimeSeriesChart()
         }
       } catch (seriesErr) {
         if (version !== summaryLoadVersion) return
-        console.error('RecordingDetail loadTimeSeriesPaged error', seriesErr)
+        timeSeriesData.value = []
+        console.error('获取热度数据失败', seriesErr)
+        seriesError.value = '热度数据加载失败，可重新应用分析参数。'
+      } finally {
+        if (version === summaryLoadVersion) seriesLoading.value = false
       }
     }
 
@@ -510,6 +495,9 @@ export default {
         markerAssignmentReady.value = false
         peakMarkerByIndex.value = {}
         timeSeriesData.value = []
+        seriesError.value = ''
+        seriesLoading.value = true
+        loading.value = false
         if (chartInstance) {
           chartInstance.destroy()
           chartInstance = null
@@ -521,7 +509,7 @@ export default {
         void loadTimeSeriesPaged(version, windowsLen, thr, searchRange)
       } catch (e) {
         console.error('RecordingDetail getAnalysis error', e)
-        error.value = '加载失败'
+        error.value = '回放分析加载失败，请重试。'
       }
     }
 
@@ -547,67 +535,9 @@ export default {
       }
     }
 
-    const fetchSubscriptions = async () => {
-      if (!currentUser.value) {
-        subscriptions.value = []
-        subscriptionsLoading.value = false
-        return
-      }
-
-      subscriptionsLoading.value = true
-      try {
-        const response = await fetch('/api/user/subscriptions')
-        if (!response.ok) {
-          throw new Error('获取订阅列表失败')
-        }
-        const data = await response.json()
-        subscriptions.value = data?.streamers || []
-      } catch (e) {
-        console.error('获取订阅主播列表失败:', e)
-        subscriptions.value = []
-      } finally {
-        subscriptionsLoading.value = false
-      }
-    }
-
-    const openStartExploreModal = () => {
-      if (!currentUser.value) {
-        error.value = '请先登录后使用订阅功能'
-        return
-      }
-      showStartExploreModal.value = true
-    }
-
-    const handleAddStreamer = async (streamerData) => {
-      try {
-        await subscribeStreamer(streamerData)
-        await fetchSubscriptions()
-        showStartExploreModal.value = false
-      } catch (e) {
-        console.error('添加主播失败:', e)
-        error.value = e.message || '添加主播失败，请稍后重试'
-      }
-    }
-
-    const handleLoginSuccess = () => {
-      fetchSubscriptions()
-    }
-
     onMounted(async () => {
-      if (!videoId) {
-        error.value = '缺少 video_id'
-        loading.value = false
-        return
-      }
-
-      await Promise.all([
-        fetchAnalysisData(),
-        fetchSubscriptions()
-      ])
+      await fetchAnalysisData()
       loading.value = false
-
-      window.addEventListener('login-success', handleLoginSuccess)
-      handleContentScroll()
     })
 
     onBeforeUnmount(() => {
@@ -616,12 +546,11 @@ export default {
         chartInstance.destroy()
         chartInstance = null
       }
-      window.removeEventListener('login-success', handleLoginSuccess)
     })
 
     return {
       videoId,
-      platform,
+      platformLabel,
       loading,
       error,
       analysis,
@@ -630,261 +559,80 @@ export default {
       analysisParams,
       refreshing,
       showAdvanced,
-      subscriptions,
-      subscriptionsLoading,
-      showStartExploreModal,
-      activeSubscriptionId,
       vodExternalUrl,
       markerAssignmentReady,
-      contentPanelRef,
-      timeSeriesChartStyle,
-      handleContentScroll,
-      formatOffset,
+      chartCanvas,
+      seriesLoading,
+      seriesError,
       intervalRange,
       toggleExpand,
       refreshAnalysis,
-      applyAdvancedParams,
-      openStartExploreModal,
-      handleAddStreamer
+      applyAdvancedParams
     }
   }
 }
 </script>
 
 <style scoped>
-.recording-detail-page {
-  --sidebar-width: 280px;
-  --panel-height: 80vh;
-  --sidebar-height: var(--panel-height);
-  padding: 1rem;
-}
-
-.recording-layout {
-  max-width: 1300px;
-  margin: 0 auto;
-  display: grid;
-  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
-  gap: 1rem;
-}
-
-.content-panel {
-  background: var(--card, #fff);
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  padding: 1.5rem;
-  height: var(--panel-height);
-  overflow-y: auto;
-}
-
-.page-title {
-  margin: 0.5rem 0 0;
-}
-
-.status-block {
-  margin-top: 1rem;
-}
-
-.meta-row {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 12px;
-  color: var(--muted);
-}
-
-.vod-link {
-  margin-left: 0.35rem;
-  color: #2563eb;
-  text-decoration: none;
-}
-
-.vod-link:hover {
-  text-decoration: underline;
-}
-
-.time-series-chart {
-  margin: 1.5rem 0;
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  transform-origin: left top;
-  transition: transform 0.1s linear;
-}
-
-.ai-params-notice {
-  display: flex;
-  gap: 0.8rem;
-  padding: 1rem 1.2rem;
-  margin: 1.5rem 0 1rem 0;
-  background: #eff6ff;
-  border-left: 4px solid #3b82f6;
-  border-radius: 6px;
-  box-shadow: 0 1px 3px rgba(59, 130, 246, 0.1);
-}
-
-.notice-icon {
-  font-size: 1.3rem;
-  flex-shrink: 0;
-  line-height: 1;
-}
-
-.notice-content {
-  flex: 1;
-}
-
-.notice-title {
-  font-weight: 600;
-  color: #1e40af;
-  font-size: 0.95rem;
-  margin-bottom: 0.4rem;
-}
-
-.notice-text {
-  font-size: 0.88rem;
-  color: #1e3a8a;
-  line-height: 1.5;
-  margin-bottom: 0.3rem;
-}
-
-.notice-dev {
-  font-size: 0.85rem;
-  color: #92400e;
-  font-style: italic;
-}
-
-.time-series-chart h3 {
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: #374151;
-  margin: 0;
-}
-
-.chart-header {
+.recording-meta {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  gap: .45rem .7rem;
+  margin-top: .55rem;
+  color: var(--muted-2);
+  font-size: .84rem;
 }
-
-.btn-advanced {
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  background: #fff;
-  color: #374151;
-  font-size: 0.85rem;
-  font-weight: 500;
-  padding: 0.35rem 0.75rem;
-  cursor: pointer;
-}
-
-.btn-advanced:hover {
-  border-color: #3b82f6;
-  color: #2563eb;
-}
-
-.chart-container {
-  height: 200px;
-  position: relative;
-}
-
-.moments-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-top: 8px;
-}
-
+.video-id { overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.analysis-state { color: var(--muted-2); text-align: center; padding: 2.8rem 1rem; font-size: .86rem; }
+.analysis-state p { margin: 0 0 .65rem; }
+.time-series-chart { padding: 1.15rem 1.25rem; margin-bottom: 1.2rem; }
+.analysis-header { display: flex; align-items: center; justify-content: space-between; gap: .8rem; }
+.analysis-header h2 { margin: 0; font-size: 1.17rem; }
+.analysis-header p { margin: .35rem 0 0; color: var(--muted-2); font-size: .82rem; line-height: 1.55; }
+.analysis-header button { flex-shrink: 0; }
+.chart-legend { display: flex; flex-wrap: wrap; align-items: center; gap: .85rem; margin: .8rem 0 .65rem; color: var(--muted-2); font-size: .73rem; }
+.chart-legend > span { display: inline-flex; align-items: center; gap: .4rem; }
+.legend-line { width: 18px; height: 2px; border-radius: 2px; background: var(--accent); }
+.legend-peak { width: 8px; height: 8px; border-radius: 50%; background: #bd501b; }
+.chart-container { position: relative; height: clamp(225px, 26vw, 340px); }
+.chart-state { min-height: 180px; display: grid; place-items: center; color: var(--muted-2); font-size: .85rem; }
+.hot-moments .analysis-header { padding: 1rem 1.25rem; }
+.moment-count { color: var(--muted-2); font-size: .8rem; white-space: nowrap; }
+.moments-list { margin: 0; padding: 0; list-style: none; }
 .moment {
-  display: flex;
-  gap: 12px;
-  background: #fff;
-  padding: 10px;
-  border-radius: 6px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  display: grid;
+  grid-template-columns: minmax(150px, .7fr) minmax(0, 2.2fr);
+  gap: .75rem 1.2rem;
+  padding: .95rem 1.25rem;
+  border-top: 1px solid var(--border);
 }
-
-.moment-left {
-  flex: 0 0 28%;
-  min-width: 150px;
-}
-
-.moment-right {
-  flex: 1;
-  max-width: 70%;
-}
-
-.moment-preview {
-  min-height: 120px;
-  max-height: 120px;
-  width: 100%;
-  background: #f3f4f6;
-  border-radius: 6px;
-  margin-top: 8px;
-  padding: 10px;
-  color: #6b7280;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  transition: max-height 0.3s ease;
-  position: relative;
-}
-
-.moment-preview.expanded {
-  max-height: none;
-}
-
-.moment-preview.clickable {
-  cursor: pointer;
-}
-
-.moment-preview.clickable:hover {
-  background: #e5e7eb;
-}
-
-.moment-preview.loading {
-  background: #fef3c7;
-}
-
-.loading-text {
-  color: #92400e;
-  font-style: italic;
-}
-
-.error-text {
-  color: #dc2626;
-}
-
-.summary-text {
-  color: #374151;
-  text-align: left;
-  width: 100%;
-  white-space: pre-wrap;
-}
-
-.placeholder-text {
-  color: #6b7280
-}
-
-.time {
-  font-weight: 700;
-  font-size: 1rem;
-  display: flex;
-  align-items: baseline;
-  gap: 0.4rem;
-}
-
+.moment-meta { display: flex; align-items: flex-start; gap: .55rem; }
+.moment-time { color: var(--text); font-size: .88rem; font-variant-numeric: tabular-nums; font-weight: 700; }
 .moment-index {
-  color: #dc2626;
-  font-weight: 800;
+  display: grid;
+  place-items: center;
+  min-width: 23px;
+  height: 23px;
+  padding: 0 .2rem;
+  border-radius: 6px;
+  color: #97421b;
+  background: #fff0e6;
+  font-size: .72rem;
+  font-weight: 750;
 }
+.moment-score { color: var(--muted-2); font-size: .76rem; font-variant-numeric: tabular-nums; }
+.moment-summary { min-width: 0; }
+.moment-summary p { margin: 0; color: var(--muted); font-size: .85rem; line-height: 1.65; overflow-wrap: anywhere; }
+.summary-text { white-space: pre-wrap; }
+.summary-text.collapsed { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+.summary-toggle { background: none; color: var(--accent); border: 0; padding: 0; margin-top: .25rem; font-size: .78rem; cursor: pointer; }
+.summary-toggle:hover { text-decoration: underline; }
 
-.interval {
-  color: #666;
-  font-size: 0.9rem;
+@media (max-width: 560px) {
+  .moment { grid-template-columns: 1fr; }
+  .time-series-chart, .hot-moments .analysis-header, .moment { padding-inline: .85rem; }
+  .time-series-chart .analysis-header { align-items: flex-start; }
 }
 
 .advanced-modal-overlay {
@@ -960,7 +708,7 @@ export default {
 
 .param-value {
   font-size: 1rem;
-  color: #3b82f6;
+  color: var(--accent);
   font-weight: 600;
   min-width: 60px;
   text-align: right;
@@ -971,7 +719,6 @@ export default {
   height: 6px;
   border-radius: 3px;
   background: #e5e7eb;
-  outline: none;
   -webkit-appearance: none;
 }
 
@@ -981,27 +728,27 @@ export default {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: #3b82f6;
+  background: var(--accent);
   cursor: pointer;
   transition: background 0.2s;
 }
 
 .param-item input[type="range"]::-webkit-slider-thumb:hover {
-  background: #2563eb;
+  background: var(--accent-hover);
 }
 
 .param-item input[type="range"]::-moz-range-thumb {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: #3b82f6;
+  background: var(--accent);
   cursor: pointer;
   border: none;
   transition: background 0.2s;
 }
 
 .param-item input[type="range"]::-moz-range-thumb:hover {
-  background: #2563eb;
+  background: var(--accent-hover);
 }
 
 .param-hint {
@@ -1015,31 +762,6 @@ export default {
   padding: 0 1.1rem 1.1rem;
   display: flex;
   justify-content: flex-end;
-}
-
-.btn-primary {
-  background: #3b82f6;
-  color: white;
-  padding: 0.6rem 1.5rem;
-  border-radius: 6px;
-  border: none;
-  cursor: pointer;
-  font-weight: 500;
-  font-size: 0.95rem;
-  transition: all 0.2s;
-  box-shadow: 0 1px 3px rgba(59, 130, 246, 0.3);
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: #2563eb;
-  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.4);
-  transform: translateY(-1px);
-}
-
-.btn-primary:disabled {
-  background: #9ca3af;
-  cursor: not-allowed;
-  box-shadow: none;
 }
 
 /* 折叠动画 */
@@ -1059,22 +781,6 @@ export default {
 .slide-fade-leave-to {
   transform: translateY(-10px);
   opacity: 0;
-}
-
-@media (max-width: 1024px) {
-  .recording-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .recording-detail-page {
-    --panel-height: auto;
-    --sidebar-height: auto;
-  }
-
-  .content-panel {
-    height: auto;
-    overflow: visible;
-  }
 }
 
 </style>

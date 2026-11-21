@@ -1,257 +1,559 @@
 <template>
-  <div class="home-page">
-    <main class="main-content">
-      <div class="home-layout">
-        <SubscriptionSidebar
-          title="我的订阅"
-          :items="streamers"
-          :loading="loading"
-          empty-text="还没有订阅主播"
-          :show-add-button="true"
-          @add-click="showStartExploreModal = true"
-        />
-
-        <section class="content-panel">
-          <div class="text-left mb-3">
-            <h2 class="page-title">SubTuber 使用说明</h2>
-            <p class="subtitle">首页模板：3 步快速开始，先订阅主播，再查看回放热点，最后持续优化你的订阅列表。</p>
-          </div>
-
-          <section class="guide-section">
-            <article class="guide-card">
-              <div class="guide-media">
-                <svg viewBox="0 0 120 90" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <rect x="8" y="8" width="104" height="74" rx="10" fill="#EEF2FF" />
-                  <circle cx="34" cy="45" r="14" fill="#C7D2FE" />
-                  <rect x="56" y="30" width="38" height="8" rx="4" fill="#818CF8" />
-                  <rect x="56" y="45" width="30" height="7" rx="3.5" fill="#A5B4FC" />
-                  <rect x="56" y="57" width="24" height="7" rx="3.5" fill="#C7D2FE" />
-                </svg>
-              </div>
-              <div class="guide-content">
-                <h3>1. 添加订阅主播</h3>
-                <p>点击左侧「+ 订阅」，输入主播信息，建立你的专属订阅列表。</p>
-              </div>
-            </article>
-
-            <article class="guide-card">
-              <div class="guide-media">
-                <svg viewBox="0 0 120 90" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <rect x="8" y="8" width="104" height="74" rx="10" fill="#ECFDF5" />
-                  <polyline points="22,60 38,45 52,52 70,30 92,42" fill="none" stroke="#10B981" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
-                  <circle cx="92" cy="42" r="5" fill="#059669" />
-                </svg>
-              </div>
-              <div class="guide-content">
-                <h3>2. 查看直播热点</h3>
-                <p>进入主播详情页，系统会展示回放与热点时段，帮助你快速回顾精彩内容。</p>
-              </div>
-            </article>
-
-            <article class="guide-card">
-              <div class="guide-media">
-                <svg viewBox="0 0 120 90" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <rect x="8" y="8" width="104" height="74" rx="10" fill="#FEF3C7" />
-                  <rect x="24" y="26" width="72" height="8" rx="4" fill="#F59E0B" />
-                  <rect x="24" y="42" width="60" height="8" rx="4" fill="#FCD34D" />
-                  <rect x="24" y="58" width="48" height="8" rx="4" fill="#FDE68A" />
-                </svg>
-              </div>
-              <div class="guide-content">
-                <h3>3. 持续优化列表</h3>
-                <p>根据观看偏好增减订阅，保持列表精简，让首页始终聚焦你最关心的主播。</p>
-              </div>
-            </article>
-          </section>
-        </section>
+  <main class="workspace-width workspace-page">
+    <header class="page-header">
+      <div>
+        <h1>内容分析工作台</h1>
+        <p>浏览直播切片报告，追踪订阅主播的回放与互动热点。</p>
       </div>
-    </main>
+      <button type="button" class="btn btn-primary" @click="$emit('request-subscribe')">
+        <span class="add-symbol" aria-hidden="true">+</span> 添加订阅
+      </button>
+    </header>
 
-    <StartExploreModal
-      v-if="showStartExploreModal"
-      @close="showStartExploreModal = false"
-      @add-streamer="handleAddStreamer"
-    />
-  </div>
+    <dl class="overview-grid" aria-label="数据概览">
+      <div class="surface overview-metric">
+        <div class="metric-content">
+          <dt>市场报告</dt>
+          <dd>{{ formatCount(totalReports) }}</dd>
+          <span>市场已发布的切片报告</span>
+        </div>
+        <span class="metric-icon violet"><i class="bi bi-file-earmark-text" aria-hidden="true"></i></span>
+      </div>
+      <div class="surface overview-metric">
+        <div class="metric-content">
+          <dt>本页高能片段</dt>
+          <dd>{{ formatCount(totalReports == null ? null : pageHighlights) }}</dd>
+          <span>当前页报告识别的片段</span>
+        </div>
+        <span class="metric-icon blue"><i class="bi bi-activity" aria-hidden="true"></i></span>
+      </div>
+      <div class="surface overview-metric">
+        <div class="metric-content">
+          <dt>我的订阅</dt>
+          <dd>{{ formatCount(subscriptionCount) }}</dd>
+          <button v-if="!currentUser" type="button" class="text-button" @click="$emit('request-login')">登录后查看 <span aria-hidden="true">→</span></button>
+          <span v-else>已订阅的主播</span>
+        </div>
+        <span class="metric-icon mint"><i class="bi bi-bookmark" aria-hidden="true"></i></span>
+      </div>
+    </dl>
+
+    <section id="clip-market" class="surface market-section" aria-labelledby="market-title">
+      <header class="market-header">
+        <div>
+          <h2 id="market-title">切片市场</h2>
+          <p>查看来自不同平台的报告摘要与高能片段。</p>
+        </div>
+        <button type="button" class="btn btn-outline btn-sm" :disabled="marketLoading" @click="fetchMarketplace(page)">
+          <i class="bi bi-arrow-clockwise" aria-hidden="true"></i> 刷新
+        </button>
+      </header>
+
+      <div v-if="marketReports.length && !marketError" class="market-controls">
+        <label class="market-search">
+          <i class="bi bi-search" aria-hidden="true"></i>
+          <input v-model.trim="search" type="search" aria-label="搜索本页报告" placeholder="搜索本页报告" />
+        </label>
+        <select v-model="platform" class="market-select" aria-label="筛选本页报告平台">
+          <option value="">全部平台</option>
+          <option v-for="name in platforms" :key="name" :value="name">{{ name }}</option>
+        </select>
+        <span class="market-count" aria-live="polite">{{ formatCount(visibleReports.length) }} 份报告<span v-if="search || platform">匹配</span></span>
+      </div>
+
+      <div v-if="marketLoading" class="market-state" role="status">
+        <span class="state-icon"><i class="bi bi-arrow-repeat" aria-hidden="true"></i></span>
+        <h3>正在加载切片报告</h3>
+      </div>
+      <div v-else-if="marketError" class="market-state" role="status">
+        <span class="state-icon"><i class="bi bi-exclamation-circle" aria-hidden="true"></i></span>
+        <h3>切片报告加载失败</h3>
+        <p>请稍后刷新，重新获取市场数据。</p>
+        <button type="button" class="btn btn-outline btn-sm" @click="fetchMarketplace(page)">重新加载</button>
+      </div>
+      <div v-else-if="!marketReports.length" class="market-state" role="status">
+        <span class="state-icon"><i class="bi bi-collection-play" aria-hidden="true"></i></span>
+        <h3>暂无切片报告</h3>
+        <p>分析完成的报告发布后会显示在这里。</p>
+      </div>
+      <div v-else-if="!visibleReports.length" class="market-state" role="status">
+        <span class="state-icon"><i class="bi bi-search" aria-hidden="true"></i></span>
+        <h3>本页没有匹配的报告</h3>
+        <button type="button" class="btn btn-outline btn-sm" @click="clearFilters">清除筛选</button>
+      </div>
+      <div v-else class="report-grid">
+        <ClipReportCard v-for="report in visibleReports" :key="report.id" :report="report" @open="openReport" />
+      </div>
+
+      <nav v-if="pageCount > 1" class="market-pagination" aria-label="市场报告分页">
+        <span>第 {{ page }} / {{ pageCount }} 页 · 共 {{ formatCount(totalReports) }} 份</span>
+        <div>
+          <button type="button" class="btn btn-outline btn-sm" :disabled="page <= 1 || marketLoading" @click="changePage(page - 1)">上一页</button>
+          <button type="button" class="btn btn-outline btn-sm" :disabled="page >= pageCount || marketLoading" @click="changePage(page + 1)">下一页</button>
+        </div>
+      </nav>
+    </section>
+
+    <dialog ref="reportDialog" class="report-dialog" aria-labelledby="report-title" @cancel="handleDialogCancel" @close="selectedReport = null">
+      <template v-if="selectedReport">
+        <header class="report-dialog-header">
+          <div>
+            <span class="platform-label" :data-platform="selectedReport.platform">{{ selectedReport.platform }}</span>
+            <h2 id="report-title">{{ selectedReport.title }}</h2>
+          </div>
+          <button type="button" class="dialog-close" aria-label="关闭报告" autofocus :disabled="reportBusy" @click="reportDialog.close()">×</button>
+        </header>
+        <div class="report-dialog-body" :aria-busy="reportBusy">
+          <section>
+            <h3>报告摘要</h3>
+            <p>{{ selectedReport.is_unlocked ? selectedReport.summary : selectedReport.preview_summary }}</p>
+          </section>
+          <section>
+            <h3>{{ selectedReport.is_unlocked ? '高能片段' : '片段预览' }}</h3>
+            <ul v-if="selectedReport.highlights.length" class="dialog-highlights">
+              <li v-for="item in selectedReport.highlights" :key="item.id">
+                <time v-if="item.time">{{ item.time }}</time>
+                <div>
+                  <strong>{{ item.label }}</strong>
+                  <p v-if="item.summary && item.summary !== item.label">{{ item.summary }}</p>
+                </div>
+              </li>
+            </ul>
+            <p v-else>暂无片段数据</p>
+          </section>
+          <p v-if="reportMessage" class="dialog-status" role="status">{{ reportMessage }}</p>
+        </div>
+        <footer class="report-dialog-footer">
+          <a v-if="selectedReport.source_link" :href="selectedReport.source_link" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-sm">
+            查看原视频 <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i>
+          </a>
+          <div class="dialog-actions">
+            <span v-if="reportBusy" class="dialog-status" role="status">处理中…</span>
+            <span v-else-if="selectedReport.is_unlocked" class="unlocked-label"><i class="bi bi-check-circle" aria-hidden="true"></i> 已解锁</span>
+            <template v-else-if="unlockPrice !== null">
+              <button type="button" class="btn btn-outline btn-sm" @click="cancelUnlock">取消</button>
+              <button type="button" class="btn btn-primary btn-sm" @click="confirmUnlock">确认解锁 · {{ formatCount(unlockPrice) }} 积分</button>
+            </template>
+            <button v-else-if="needsDetail" type="button" class="btn btn-outline btn-sm" @click="loadReportDetail">重新获取报告</button>
+            <button v-else type="button" class="btn btn-primary btn-sm" @click="requestUnlock">
+              {{ currentUser ? '解锁完整报告' : '登录后解锁' }}
+            </button>
+          </div>
+        </footer>
+      </template>
+    </dialog>
+  </main>
 </template>
 
-<script>
-import { ref, onMounted, onBeforeUnmount } from 'vue'
-import { subscribeStreamer } from '../api/streamers'
-import StartExploreModal from '../components/StartExploreModal.vue'
-import SubscriptionSidebar from '../components/SubscriptionSidebar.vue'
+<script setup>
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { getClipReportDetail, getClipReportUnlockQuote, getClipReportsMarketplace, unlockClipReport } from '../api/streamers'
+import ClipReportCard from '../components/ClipReportCard.vue'
 import { useAuth } from '../composables/useAuth'
 import { showNotification } from '../utils/notification'
+import { formatPlatformName } from '../utils/platform'
 
-export default {
-  components: {
-    StartExploreModal,
-    SubscriptionSidebar
-  },
-  setup() {
-    const { currentUser } = useAuth()
-    const loading = ref(false)
-    const showStartExploreModal = ref(false)
-    const streamers = ref([])
+defineProps({ subscriptionCount: { type: Number, default: null } })
+const emit = defineEmits(['request-login', 'request-subscribe'])
+const { currentUser } = useAuth()
+const pageSize = 6
+const marketReports = ref([])
+const marketLoading = ref(true)
+const marketError = ref(false)
+const totalReports = ref(null)
+const page = ref(1)
+const search = ref('')
+const platform = ref('')
+const reportDialog = ref(null)
+const selectedReport = ref(null)
+const reportBusy = ref(false)
+const reportMessage = ref('')
+const unlockPrice = ref(null)
+const needsDetail = ref(false)
+const reportDetails = new Map()
+let marketRequest = 0
+const numberFormat = new Intl.NumberFormat('zh-CN')
 
-    const fetchStreamers = async () => {
-      if (!currentUser.value) {
-        streamers.value = []
-        loading.value = false
-        return
-      }
+const pageCount = computed(() => Math.max(1, Math.ceil(totalReports.value / pageSize)))
+const pageHighlights = computed(() => marketReports.value.reduce((count, report) => count + report.highlights.length, 0))
+const platforms = computed(() => [...new Set(marketReports.value.map(report => report.platform))].sort())
+const visibleReports = computed(() => {
+  const query = search.value.toLocaleLowerCase()
+  return marketReports.value.filter(report => {
+    if (platform.value && report.platform !== platform.value) return false
+    return [report.title, report.source_video_id, report.preview_summary, report.platform]
+      .some(value => String(value || '').toLocaleLowerCase().includes(query))
+  })
+})
 
-      loading.value = true
-      try {
-        const response = await fetch('/api/user/subscriptions')
-        if (!response.ok) {
-          throw new Error('获取订阅列表失败')
-        }
-        const data = await response.json()
-        streamers.value = data?.streamers || []
-      } catch (e) {
-        console.error('获取订阅主播列表失败:', e)
-        streamers.value = []
-      } finally {
-        loading.value = false
-      }
-    }
+function formatCount(value) {
+  return value == null ? '—' : numberFormat.format(value)
+}
 
-    const handleLoginSuccess = () => {
-      fetchStreamers()
-    }
+function formatTime(value) {
+  const seconds = Number(value)
+  if (value == null || value === '' || !Number.isFinite(seconds) || seconds < 0) return ''
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  const parts = hours ? [hours, minutes, Math.floor(seconds % 60)] : [minutes, Math.floor(seconds % 60)]
+  return parts.map(part => String(part).padStart(2, '0')).join(':')
+}
 
-    onMounted(() => {
-      fetchStreamers()
-      window.addEventListener('login-success', handleLoginSuccess)
-    })
-
-    onBeforeUnmount(() => {
-      window.removeEventListener('login-success', handleLoginSuccess)
-    })
-
-    const handleAddStreamer = async (streamerData) => {
-      try {
-        await subscribeStreamer(streamerData)
-        await fetchStreamers()
-      } catch (e) {
-        console.error('添加主播失败:', e)
-        showNotification(e.message || '添加主播失败，请稍后重试')
-      }
-    }
-
-    return {
-      loading,
-      streamers,
-      showStartExploreModal,
-      handleAddStreamer
-    }
+function sourceLink(value) {
+  if (!value) return ''
+  try {
+    const url = new URL(value)
+    return ['https:', 'http:'].includes(url.protocol) ? url.href : ''
+  } catch {
+    return ''
   }
 }
+
+function normalizeReport(report, fallback = {}) {
+  const id = report.id || report.report_id || fallback.id || report.source_video_id || report.video_id
+  const videoId = report.source_video_id || report.video_id || fallback.source_video_id
+  const isUnlocked = Boolean(report.is_unlocked || report.unlocked)
+  const items = isUnlocked ? report.highlights : report.preview_highlights ?? report.highlights
+  const preview = report.preview_summary || report.spoiler_free_summary || report.summary || fallback.preview_summary || '暂无报告摘要'
+  return {
+    id,
+    source_video_id: videoId,
+    source_link: sourceLink(report.source_url) || fallback.source_link,
+    title: report.title || fallback.title || (videoId ? `视频 ${videoId}` : `切片报告 #${id}`),
+    platform: formatPlatformName(report.source_platform || report.platform || fallback.platform),
+    date: report.completed_at || report.created_at || fallback.date,
+    summary: report.summary || report.spoiler_free_summary || preview,
+    preview_summary: preview,
+    unlock_cost: Number(report.unlock_cost ?? report.unlock_price_points ?? report.price ?? fallback.unlock_cost ?? 0),
+    is_unlocked: isUnlocked,
+    highlights: (Array.isArray(items) ? items : []).map((item, index) => {
+      const start = formatTime(item.start_seconds)
+      const end = formatTime(item.end_seconds)
+      return {
+        id: item.id || index,
+        label: item.label || item.title || item.summary || '高能片段',
+        summary: item.summary || item.description || '',
+        time: isUnlocked ? item.time || (start && end ? `${start} – ${end}` : start) : ''
+      }
+    })
+  }
+}
+
+function clearFilters() {
+  search.value = ''
+  platform.value = ''
+}
+
+async function fetchMarketplace(requestedPage) {
+  const request = ++marketRequest
+  marketLoading.value = true
+  marketError.value = false
+  try {
+    const data = await getClipReportsMarketplace({ page: requestedPage, page_size: pageSize })
+    if (request !== marketRequest) return
+    const items = Array.isArray(data) ? data : data?.items || data?.reports || []
+    const total = data?.total ?? items.length
+    const lastPage = Math.max(1, Math.ceil(total / pageSize))
+    if (requestedPage > lastPage) {
+      return fetchMarketplace(lastPage)
+    }
+    marketReports.value = items.map(item => {
+      const report = normalizeReport(item)
+      return reportDetails.get(report.id) || report
+    })
+    totalReports.value = total
+    page.value = Number(data?.page) || requestedPage
+    if (!platforms.value.includes(platform.value)) platform.value = ''
+  } catch (error) {
+    if (request !== marketRequest) return
+    console.error('获取切片市场失败', error)
+    marketError.value = true
+  } finally {
+    if (request === marketRequest) marketLoading.value = false
+  }
+}
+
+async function changePage(nextPage) {
+  clearFilters()
+  await fetchMarketplace(nextPage)
+  document.getElementById('clip-market')?.scrollIntoView({ block: 'start' })
+}
+
+async function openReport(report) {
+  selectedReport.value = report
+  unlockPrice.value = null
+  needsDetail.value = false
+  reportMessage.value = ''
+  await nextTick()
+  if (selectedReport.value?.id !== report.id || !reportDialog.value) return
+  reportDialog.value.showModal()
+  if (currentUser.value && !report.is_unlocked) void loadReportDetail()
+}
+
+function handleDialogCancel(event) {
+  if (reportBusy.value) event.preventDefault()
+}
+
+async function fetchSelectedDetail() {
+  const original = selectedReport.value
+  const user = currentUser.value
+  const data = await getClipReportDetail(original.id)
+  if (currentUser.value !== user || selectedReport.value?.id !== original.id) return
+  if (!data) throw new Error('报告详情暂不可用')
+
+  const detail = normalizeReport(data.report || data, original)
+  selectedReport.value = detail
+  if (detail.is_unlocked) {
+    reportDetails.set(detail.id, detail)
+    marketReports.value = marketReports.value.map(report => report.id === detail.id ? detail : report)
+  }
+  return detail
+}
+
+async function loadReportDetail() {
+  reportBusy.value = true
+  reportMessage.value = ''
+  try {
+    await fetchSelectedDetail()
+    needsDetail.value = false
+  } catch {
+    reportMessage.value = '暂时无法加载报告详情，请重试。'
+    needsDetail.value = true
+  } finally {
+    reportBusy.value = false
+  }
+}
+
+async function requestUnlock() {
+  if (!currentUser.value) {
+    reportDialog.value.close()
+    emit('request-login')
+    return
+  }
+
+  reportBusy.value = true
+  reportMessage.value = ''
+  try {
+    const quote = await getClipReportUnlockQuote(selectedReport.value.id)
+    if (quote?.already_unlocked) {
+      needsDetail.value = true
+      const detail = await fetchSelectedDetail()
+      if (!detail?.is_unlocked) throw new Error('报告详情正在更新，请重试。')
+      needsDetail.value = false
+      return
+    }
+    unlockPrice.value = Number(quote?.unlock_price_points ?? quote?.unlock_cost ?? quote?.price ?? quote?.amount ?? selectedReport.value.unlock_cost)
+    reportMessage.value = '确认后扣除积分，完整时间戳将永久可见。'
+  } catch (error) {
+    reportMessage.value = error.message || '暂时无法获取解锁价格，请重试。'
+  } finally {
+    reportBusy.value = false
+  }
+}
+
+function cancelUnlock() {
+  unlockPrice.value = null
+  reportMessage.value = ''
+}
+
+async function confirmUnlock() {
+  if (reportBusy.value || unlockPrice.value === null) return
+  reportBusy.value = true
+  reportMessage.value = ''
+  try {
+    await unlockClipReport(selectedReport.value.id, { confirm: true })
+    unlockPrice.value = null
+    needsDetail.value = true
+    const detail = await fetchSelectedDetail()
+    if (!detail?.is_unlocked) throw new Error('报告正在更新')
+    needsDetail.value = false
+    showNotification('报告已解锁')
+  } catch (error) {
+    reportMessage.value = needsDetail.value ? '报告已解锁，请重新获取详情。' : error.message || '解锁失败，请稍后重试。'
+  } finally {
+    reportBusy.value = false
+  }
+}
+
+watch(currentUser, () => {
+  reportDetails.clear()
+  if (reportDialog.value?.open) reportDialog.value.close()
+  void fetchMarketplace(page.value)
+})
+onMounted(() => fetchMarketplace(1))
 </script>
 
 <style scoped>
-.home-page {
+.add-symbol { font-size: 1.2rem; line-height: .9; }
+.overview-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 0 0 1.45rem;
+}
+
+.overview-metric {
+  min-height: 129px;
   display: flex;
-  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: .6rem;
+  padding: 1.04rem 1.15rem;
 }
 
-.main-content {
-  flex: 1 1 auto;
-  overflow: hidden;
-  padding: 1rem;
+.metric-content dt { color: var(--muted); font-size: .86rem; font-weight: 650; }
+.metric-content dd {
+  margin: .23rem 0 .03rem;
+  font-size: clamp(1.85rem, 3vw, 2.2rem);
+  font-weight: 710;
+  line-height: 1.18;
+  letter-spacing: -.05em;
+  font-variant-numeric: tabular-nums;
 }
 
-.home-layout {
-  --sidebar-width: 280px;
-  --sidebar-top: 92px;
-  --panel-height: 80vh;
-  --sidebar-height: var(--panel-height);
-  max-width: 1300px;
-  margin: 0 auto;
+.metric-content > span, .text-button { color: var(--muted-2); font-size: .75rem; }
+.text-button { border: 0; padding: 0; background: none; color: var(--accent); cursor: pointer; }
+.text-button:hover { text-decoration: underline; }
+
+.metric-icon, .state-icon {
   display: grid;
-  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
-  gap: 1rem;
+  flex: 0 0 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 9px;
+  font-size: 1rem;
 }
 
-.content-panel {
-  background: var(--card, #fff);
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+.metric-icon.violet, .state-icon { color: var(--accent); background: var(--accent-soft); }
+.metric-icon.blue { color: #2555a5; background: #eaf1ff; }
+.metric-icon.mint { color: #087661; background: #e5f6ef; }
+
+.market-section { scroll-margin-top: calc(var(--topbar-height) + 18px); }
+.market-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: .85rem;
+  padding: 1.2rem 1.25rem 1.05rem;
 }
 
-.content-panel {
-  padding: 1.5rem;
-  height: var(--panel-height);
-  overflow-y: auto;
+.market-header h2 { margin: 0; font-size: 1.2rem; letter-spacing: -.025em; }
+.market-header p { margin: .3rem 0 0; color: var(--muted-2); font-size: .83rem; line-height: 1.55; }
+.market-header button { flex-shrink: 0; }
+
+.market-controls {
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  padding: .7rem 1.25rem;
+  border-block: 1px solid var(--border);
+  background: #fafbfe;
 }
 
-.page-title {
-  font-size: 1.5rem;
-  margin-bottom: 1rem;
-  color: var(--muted, #374151);
+.market-search, .market-select {
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--card);
+  color: var(--muted);
+  font-size: .82rem;
 }
 
-.subtitle {
-  font-size: 0.95rem;
-  color: #6b7280;
-  margin-top: 0.25rem;
+.market-search {
+  width: min(100%, 255px);
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  padding: 0 .65rem;
 }
 
-.guide-section {
-  margin-top: 1.25rem;
+.market-search:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
+.market-search input { width: 100%; min-width: 0; border: 0; outline: none; color: var(--text); background: transparent; }
+.market-search input:focus-visible { outline: none; }
+.market-search input::placeholder { color: var(--muted-2); }
+.market-select { padding: 0 .45rem 0 .6rem; }
+.market-count { margin-left: auto; color: var(--muted-2); font-size: .78rem; white-space: nowrap; }
+
+.report-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .9rem;
+  padding: 1.1rem 1.25rem 1.25rem;
 }
 
-.guide-card {
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
+.market-state {
+  min-height: 275px;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: .65rem;
   padding: 1rem;
-  background: #fff;
+  border-top: 1px solid var(--border);
+  text-align: center;
 }
 
-.guide-media {
-  width: 100%;
-  border-radius: 10px;
-  overflow: hidden;
-  background: #f9fafb;
+.market-controls + .market-state { border-top: 0; }
+.state-icon { width: 44px; height: 44px; font-size: 1.2rem; }
+.market-state h3 { margin: .2rem 0 0; font-size: 1rem; }
+.market-state p { margin: 0; color: var(--muted-2); font-size: .86rem; }
+
+.market-pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: .65rem;
+  padding: .8rem 1.25rem;
+  border-top: 1px solid var(--border);
+  color: var(--muted-2);
+  font-size: .79rem;
 }
 
-.guide-media svg {
-  display: block;
-  width: 100%;
-  height: auto;
+.market-pagination div, .dialog-actions { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; }
+
+.report-dialog {
+  width: min(620px, calc(100% - 2rem));
+  max-height: calc(100dvh - 2rem);
+  padding: 0;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-lg);
 }
 
-.guide-content h3 {
-  margin: 0.85rem 0 0.4rem;
-  font-size: 1.05rem;
-  color: #111827;
+.report-dialog[open] { display: flex; flex-direction: column; }
+.report-dialog::backdrop { background: rgba(18, 25, 47, .58); }
+.report-dialog-header, .report-dialog-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: .75rem;
+  padding: 1rem 1.25rem;
 }
 
-.guide-content p {
-  margin: 0;
-  font-size: 0.9rem;
-  color: #4b5563;
-  line-height: 1.5;
-}
+.report-dialog-header { align-items: flex-start; border-bottom: 1px solid var(--border); }
+.report-dialog-header h2 { margin: .38rem 0 0; font-size: 1.28rem; overflow-wrap: anywhere; }
+.report-dialog-footer { align-items: center; flex-wrap: wrap; border-top: 1px solid var(--border); }
+.dialog-actions { margin-left: auto; }
+.dialog-close { border: 0; background: transparent; color: var(--muted); font-size: 1.45rem; cursor: pointer; }
+.report-dialog-body { overflow-y: auto; display: grid; gap: 1.15rem; padding: 1rem 1.25rem; }
+.report-dialog-body h3 { margin: 0 0 .4rem; font-size: .92rem; }
+.report-dialog-body p { margin: 0; color: var(--muted); font-size: .85rem; line-height: 1.65; overflow-wrap: anywhere; }
+.dialog-highlights { display: grid; gap: .5rem; padding: 0; margin: 0; list-style: none; }
+.dialog-highlights li { display: flex; flex-wrap: wrap; gap: .35rem .65rem; padding: .55rem .65rem; background: var(--bg); border-radius: 7px; font-size: .85rem; }
+.dialog-highlights time { font-variant-numeric: tabular-nums; color: var(--accent); font-weight: 650; }
+.dialog-highlights li > div { flex: 1 0 190px; min-width: 0; overflow-wrap: anywhere; }
+.dialog-status { color: var(--muted-2); font-size: .8rem; }
+.unlocked-label { color: #087661; font-size: .82rem; font-weight: 650; }
 
-@media (max-width: 1024px) {
-  .main-content {
-    overflow: auto;
-  }
-
-  .home-layout {
-    grid-template-columns: 1fr;
-    --panel-height: auto;
-    --sidebar-height: auto;
-  }
-
-  .content-panel {
-    height: auto;
-    overflow: visible;
-  }
+@media (max-width: 1150px) { .report-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 510px) {
+  .overview-grid { gap: .48rem; }
+  .overview-metric { padding: .65rem .55rem; min-height: 103px; }
+  .metric-icon, .market-count { display: none; }
+  .metric-content dt { font-size: .76rem; }
+  .metric-content > span, .text-button { font-size: .66rem; }
+  .report-grid { grid-template-columns: 1fr; }
+  .market-header, .market-controls, .market-pagination, .report-grid { padding-inline: .85rem; }
 }
 </style>

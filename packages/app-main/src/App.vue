@@ -1,420 +1,286 @@
 <template>
-  <div id="app">
-    <!-- 全局通知 Banner -->
-    <transition name="slide-down">
-      <div v-if="showNotification" class="notification-banner">
-        <span>{{ notificationMessage }}</span>
-        <button @click="showNotification = false" class="notification-close">×</button>
-      </div>
-    </transition>
-    
-    <nav class="navbar">
-      <div class="navbar-container">
-        <div class="brand-row">
-          <router-link to="/" class="brand">SubTuber</router-link>
-          <button class="nav-back" :disabled="!canGoBack" @click="goBack">← 返回</button>
-        </div>
-        <div class="nav-links">
-        </div>
-        <div class="nav-actions">
-          <router-link v-if="currentUser" to="/settings" class="btn btn-ghost">
-            <i class="bi bi-person-circle" aria-hidden="true"></i>
-            {{ currentUser.displayName || currentUser.email }}
-          </router-link>
-          <button v-else class="btn btn-primary" @click="showLogin = true">登录</button>
-        </div>
-      </div>
-    </nav>
+  <div class="app-shell">
+    <button
+      v-if="navigationOpen"
+      type="button"
+      class="navigation-backdrop"
+      aria-label="关闭导航"
+      @click="closeNavigation"
+    ></button>
 
-    <router-view />
+    <aside id="workspace-navigation" class="workspace-sidebar" :class="{ 'is-open': navigationOpen }">
+      <RouterLink to="/" class="workspace-brand" @click="closeNavigation">
+        <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+        <span class="brand-name">SubTuber<small>直播内容分析</small></span>
+      </RouterLink>
 
-    <footer class="app-footer">
-      <div class="footer-container">
-        <div class="footer-main">
-          <div class="footer-section platform-section">
-            <div class="footer-text">
-              <span class="platform-badge supported">Twitch</span> 
-              <span class="platform-badge supported">YouTube</span> 已支持
-              <span class="separator">·</span>
-              <span class="platform-badge developing">Bilibili</span> 
-              暂时无计划，可以进群交流
-            </div>
+      <div class="workspace-nav-group">
+        <p class="workspace-nav-label">工作台</p>
+        <nav class="workspace-nav" aria-label="工作台导航">
+          <RouterLink
+            to="/"
+            :class="{ selected: route.path === '/' && !route.hash }"
+            :aria-current="route.path === '/' && !route.hash ? 'page' : false"
+            @click="closeNavigation"
+          >
+            <i class="bi bi-grid-1x2" aria-hidden="true"></i> 数据概览
+          </RouterLink>
+          <RouterLink
+            :to="{ path: '/', hash: '#clip-market' }"
+            :class="{ selected: route.hash === '#clip-market' }"
+            :aria-current="route.hash === '#clip-market' ? 'location' : false"
+            @click="closeNavigation"
+          >
+            <i class="bi bi-collection-play" aria-hidden="true"></i> 切片市场
+          </RouterLink>
+        </nav>
+      </div>
+
+      <SubscriptionSidebar
+        :items="subscriptions"
+        :loading="subscriptionsLoading"
+        :error="subscriptionsError"
+        :logged-in="Boolean(currentUser)"
+        :active-id="activeSubscriptionId"
+        @add-click="openSubscribe"
+        @login="openLogin"
+        @retry="fetchSubscriptions"
+        @navigate="closeNavigation"
+      />
+
+      <div class="workspace-nav workspace-sidebar-footer">
+        <RouterLink v-if="currentUser" to="/settings" :class="{ selected: route.path === '/settings' }" @click="closeNavigation">
+          <i class="bi bi-gear" aria-hidden="true"></i> 账号设置
+        </RouterLink>
+        <button v-else type="button" @click="openLogin">
+          <i class="bi bi-box-arrow-in-right" aria-hidden="true"></i> 登录账号
+        </button>
+      </div>
+    </aside>
+
+    <div class="workspace-main">
+      <header class="workspace-topbar">
+        <div class="topbar-inner">
+          <div class="topbar-location">
+            <button
+              ref="navigationToggle"
+              class="btn btn-outline navigation-toggle"
+              type="button"
+              aria-label="打开导航"
+              aria-controls="workspace-navigation"
+              :aria-expanded="navigationOpen"
+              @click="navigationOpen = !navigationOpen"
+            >
+              <i class="bi bi-list" aria-hidden="true"></i><span>菜单</span>
+            </button>
+            <nav class="breadcrumb" aria-label="当前位置">
+              <RouterLink to="/">工作台</RouterLink>
+              <span class="breadcrumb-divider" aria-hidden="true">/</span>
+              <RouterLink
+                v-if="route.name === 'recording' && activeSubscriptionId"
+                :to="{ name: 'streamer-detail', params: { streamer_id: activeSubscriptionId } }"
+                class="breadcrumb-parent"
+              >直播回放</RouterLink>
+              <span v-if="route.name === 'recording' && activeSubscriptionId" class="breadcrumb-divider breadcrumb-parent" aria-hidden="true">/</span>
+              <span aria-current="page">{{ pageLabel }}</span>
+            </nav>
           </div>
 
-          <div class="footer-section qr-section">
-            <span class="footer-hint">开发交流与反馈：</span>
-            <div class="qr-codes">
-              <div class="qr-item">
-                <div class="qr-placeholder">
-                  <img src="../images/qq.png" alt="QQ群二维码" class="qr-image" />
-                </div>
-                <span class="qr-label">QQ群</span>
+          <RouterLink v-if="currentUser" to="/settings" class="account-button">
+            <span class="account-avatar" aria-hidden="true">{{ accountLabel.slice(0, 1).toUpperCase() }}</span>
+            <span class="account-name">{{ accountLabel }}</span>
+            <i class="bi bi-chevron-down" aria-hidden="true"></i>
+          </RouterLink>
+          <button v-else type="button" class="btn btn-primary btn-sm" @click="openLogin">登录</button>
+        </div>
+      </header>
+
+      <RouterView v-slot="{ Component }">
+        <component
+          :is="Component"
+          v-if="route.path === '/'"
+          :subscription-count="currentUser && !subscriptionsError && !subscriptionsLoading ? subscriptions.length : null"
+          @request-login="openLogin"
+          @request-subscribe="openSubscribe"
+        />
+        <component
+          :is="Component"
+          v-else
+          :key="route.name === 'recording' ? route.fullPath : route.name"
+          @request-login="openLogin"
+        />
+      </RouterView>
+
+      <footer class="workspace-footer">
+        <div class="workspace-width footer-inner">
+          <span>© {{ currentYear }} SubTuber</span>
+          <nav aria-label="关于 SubTuber">
+            <a href="https://github.com/Eanvans/subtuber" target="_blank" rel="noopener noreferrer">GitHub</a>
+            <RouterLink to="/privacy">隐私</RouterLink>
+            <RouterLink to="/terms">条款</RouterLink>
+            <details class="feedback">
+              <summary>交流与反馈</summary>
+              <div class="feedback-popover">
+                <img src="../images/qq.png" alt="开发交流 QQ 群二维码" width="128" height="128" />
+                <span>开发交流 QQ 群</span>
+                <span>已支持 Twitch、YouTube</span>
               </div>
-            </div>
-          </div>
-
-          <div class="footer-section links-section">
-            <p class="copyright">© {{ currentYear }} SubTuber</p>
-            <p class="footer-links">
-              <a href="https://github.com/Eanvans/subtuber" target="_blank" rel="noopener">GitHub</a>
-              <span class="separator">·</span>
-              <router-link to="/privacy">隐私</router-link>
-              <span class="separator">·</span>
-              <router-link to="/terms">条款</router-link>
-            </p>
-          </div>
+            </details>
+          </nav>
         </div>
-      </div>
-    </footer>
-
-    <div v-if="showLogin" class="login-overlay">
-      <div class="login-card">
-        <button class="btn-close" @click="showLogin = false">×</button>
-        <Login @verified="onVerified" @sent="onSent" @error="onLoginError" />
-      </div>
+      </footer>
     </div>
+
+    <Transition name="slide-down">
+      <div v-if="notificationMessage" class="workspace-notification" role="status">
+        <span>{{ notificationMessage }}</span>
+        <button type="button" aria-label="关闭通知" @click="notificationMessage = ''">×</button>
+      </div>
+    </Transition>
+
+    <dialog ref="loginDialog" class="workspace-dialog" aria-labelledby="workspace-login-title" @click.self="loginDialog.close()" @close="loginForm?.clearCode()">
+      <button type="button" class="workspace-dialog-close" aria-label="关闭登录" @click="loginDialog.close()">×</button>
+      <Login v-if="loginOpened" ref="loginForm" title-id="workspace-login-title" @verified="onVerified" />
+    </dialog>
+
+    <StartExploreModal
+      v-if="showSubscribe"
+      @close="showSubscribe = false"
+      @add-streamer="handleAddStreamer"
+    />
   </div>
 </template>
 
-<script>
-import { ref, onMounted, onBeforeUnmount, computed } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+<script setup>
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import Login from '../../shared-auth/Login.vue'
+import { subscribeStreamer } from './api/streamers'
+import StartExploreModal from './components/StartExploreModal.vue'
+import SubscriptionSidebar from './components/SubscriptionSidebar.vue'
 import { useAuth } from './composables/useAuth'
+import { showNotification } from './utils/notification'
 
-export default {
-  name: 'App',
-  components: { Login },
-  setup() {
-    const router = useRouter()
-    const route = useRoute()
-    const showLogin = ref(false)
-    const { currentUser, setUser } = useAuth()
-    const currentYear = new Date().getFullYear()
-    const showNotification = ref(false)
-    const notificationMessage = ref('')
+const route = useRoute()
+const { currentUser, setUser } = useAuth()
+const currentYear = new Date().getFullYear()
+const navigationOpen = ref(false)
+const navigationToggle = ref(null)
+const loginOpened = ref(false)
+const loginDialog = ref(null)
+const loginForm = ref(null)
+const showSubscribe = ref(false)
+const subscriptions = ref([])
+const subscriptionsLoading = ref(false)
+const subscriptionsError = ref(false)
+const notificationMessage = ref('')
+let subscriptionsRequest = 0
+let notificationTimeout
+let subscribeAfterLogin = false
 
-    // 全局通知处理
-    const handleShowNotification = (event) => {
-      notificationMessage.value = event.detail.message
-      showNotification.value = true
-      setTimeout(() => {
-        showNotification.value = false
-      }, 3000)
-    }
+const pageLabels = {
+  settings: '账号设置',
+  privacy: '隐私政策',
+  terms: '服务条款',
+  'streamer-detail': '直播回放',
+  recording: '回放分析'
+}
+const pageLabel = computed(() => pageLabels[route.name] || (route.hash === '#clip-market' ? '切片市场' : '数据概览'))
+const accountLabel = computed(() => currentUser.value?.displayName || currentUser.value?.email || '我的账号')
+const activeSubscriptionId = computed(() => String(route.params.streamer_id || route.query.streamer_id || ''))
 
-    onMounted(() => {
-      window.addEventListener('show-notification', handleShowNotification)
-    })
+function closeNavigation() {
+  if (!navigationOpen.value) return
+  navigationOpen.value = false
+  if (navigationToggle.value?.offsetWidth) navigationToggle.value.focus()
+}
 
-    onBeforeUnmount(() => {
-      window.removeEventListener('show-notification', handleShowNotification)
-    })
+async function openLogin(forSubscription = false) {
+  closeNavigation()
+  subscribeAfterLogin = forSubscription === true
+  loginOpened.value = true
+  await nextTick()
+  if (loginDialog.value?.open) return
+  loginDialog.value?.showModal()
+  loginForm.value?.focusEmail()
+}
 
-    const onVerified = (res) => {
-      showLogin.value = false
-      const user = res && res.user ? res.user : null
-      if (user) {
-        setUser(user)
-        // 发送登录成功事件
-        window.dispatchEvent(new CustomEvent('login-success', { detail: { user } }))
-        // 登录成功后跳转到首页
-        router.push('/')
-      }
-    }
-    const onSent = () => {}
-    const onLoginError = (e) => { console.error(e) }
-    const canGoBack = computed(() => route.path !== '/')
-    const goBack = () => {
-      if (!canGoBack.value) return
-      router.back()
-    }
-
-    return { 
-      showLogin, 
-      currentUser, 
-      currentYear, 
-      onVerified, 
-      onSent, 
-      onLoginError,
-      showNotification,
-      notificationMessage,
-      canGoBack,
-      goBack
-    }
+function openSubscribe() {
+  closeNavigation()
+  if (currentUser.value) {
+    showSubscribe.value = true
+  } else {
+    void openLogin(true)
   }
 }
+
+async function fetchSubscriptions() {
+  const request = ++subscriptionsRequest
+  const user = currentUser.value
+  subscriptionsError.value = false
+  subscriptionsLoading.value = Boolean(user)
+  if (!user) return
+
+  try {
+    const response = await fetch('/api/user/subscriptions')
+    if (!response.ok) throw new Error('获取订阅列表失败')
+    const data = await response.json()
+    if (request === subscriptionsRequest) subscriptions.value = data?.streamers || []
+  } catch (error) {
+    if (request === subscriptionsRequest) subscriptionsError.value = true
+    console.error('获取订阅列表失败', error)
+  } finally {
+    if (request === subscriptionsRequest) subscriptionsLoading.value = false
+  }
+}
+
+async function handleAddStreamer(streamerData) {
+  const user = currentUser.value
+  try {
+    await subscribeStreamer(streamerData)
+    if (user === currentUser.value) {
+      showNotification('订阅已添加')
+      await fetchSubscriptions()
+    }
+  } catch (error) {
+    showNotification(error.message || '添加主播失败，请稍后重试')
+  }
+}
+
+function onVerified(result) {
+  if (!result?.user) return
+
+  loginDialog.value?.close()
+  setUser(result.user)
+  showNotification('登录成功')
+  window.dispatchEvent(new CustomEvent('login-success', { detail: { user: result.user } }))
+  if (subscribeAfterLogin) showSubscribe.value = true
+  subscribeAfterLogin = false
+}
+
+function handleNotification(event) {
+  notificationMessage.value = event.detail.message
+  clearTimeout(notificationTimeout)
+  notificationTimeout = setTimeout(() => { notificationMessage.value = '' }, 3000)
+}
+
+function handleEscape(event) {
+  if (event.key === 'Escape' && !loginDialog.value?.open) closeNavigation()
+}
+
+watch(currentUser, () => {
+  subscriptions.value = []
+  void fetchSubscriptions()
+}, { immediate: true })
+watch(() => route.fullPath, closeNavigation)
+
+onMounted(() => {
+  window.addEventListener('show-notification', handleNotification)
+  window.addEventListener('keydown', handleEscape)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('show-notification', handleNotification)
+  window.removeEventListener('keydown', handleEscape)
+  clearTimeout(notificationTimeout)
+})
 </script>
-
-<style>
-.brand-row {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.nav-back {
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  background: #fff;
-  color: #374151;
-  font-size: 0.9rem;
-  font-weight: 500;
-  padding: 0.4rem 0.8rem;
-  cursor: pointer;
-}
-
-.nav-back:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.nav-back:not(:disabled):hover {
-  border-color: #3b82f6;
-  color: #2563eb;
-}
-
-.notification-banner {
-  position: fixed;
-  top: 80px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  padding: 1rem 1.5rem;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  display: flex;
-  align-items: center;
-  justify-content: space-around;
-  gap: 1rem;
-  z-index: 1000;
-  min-width: 300px;
-  max-width: 500px;
-}
-
-.notification-close {
-  background: none;
-  border: none;
-  color: white;
-  font-size: 1.5rem;
-  cursor: pointer;
-  padding: 0;
-  line-height: 1;
-  opacity: 0.8;
-  transition: opacity 0.2s;
-}
-
-.notification-close:hover {
-  opacity: 1;
-}
-
-.slide-down-enter-active,
-.slide-down-leave-active {
-  transition: all 0.3s ease;
-}
-
-.slide-down-enter-from {
-  opacity: 0;
-  transform: translateX(-50%) translateY(-20px);
-}
-
-.slide-down-leave-to {
-  opacity: 0;
-  transform: translateX(-50%) translateY(-20px);
-}
-
-.login-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-.login-card {
-  width: 420px;
-  max-width: 95%;
-  background: var(--card, #fff);
-  padding: 1rem;
-  border-radius: 8px;
-  position: relative;
-}
-.btn-close {
-  position: absolute;
-  right: 8px;
-  top: 8px;
-  border: none;
-  background: transparent;
-  font-size: 1.25rem;
-}
-
-/* Footer Styles */
-.app-footer {
-  background: #f9fafb;
-  border-top: 1px solid #e5e7eb;
-  margin-top: 2rem;
-  padding: 1.5rem 1rem;
-}
-
-.footer-container {
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
-.footer-main {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 2rem;
-  flex-wrap: wrap;
-}
-
-.footer-section {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.platform-section {
-  flex: 1;
-  min-width: 280px;
-}
-
-.qr-section {
-  flex: 0 0 auto;
-}
-
-.links-section {
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.25rem;
-}
-
-.footer-text {
-  margin: 0;
-  color: #6b7280;
-  font-size: 0.85rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.platform-badge {
-  display: inline-block;
-  padding: 3px 8px;
-  border-radius: 4px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.platform-badge.supported {
-  background: #d1fae5;
-  color: #059669;
-}
-
-.platform-badge.developing {
-  background: #fef3c7;
-  color: #d97706;
-}
-
-.qr-codes {
-  display: flex;
-  gap: 1rem;
-}
-
-.qr-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-.qr-placeholder {
-  width: 60px;
-  height: 60px;
-  border-radius: 6px;
-  overflow: hidden;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
-}
-
-.qr-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-.qr-label {
-  font-size: 0.7rem;
-  color: #6b7280;
-  font-weight: 500;
-}
-
-.footer-hint {
-  font-size: 0.85rem;
-  color: #6b7280;
-  margin: 0;
-  white-space: nowrap;
-}
-
-.copyright {
-  margin: 0;
-  color: #6b7280;
-  font-size: 0.85rem;
-  white-space: nowrap;
-}
-
-.footer-links {
-  margin: 0;
-  font-size: 0.8rem;
-  white-space: nowrap;
-}
-
-.footer-links a {
-  color: #3b82f6;
-  text-decoration: none;
-  transition: color 0.2s;
-}
-
-.footer-links a:hover {
-  color: #2563eb;
-  text-decoration: underline;
-}
-
-.footer-links .separator,
-.footer-text .separator {
-  margin: 0 0.25rem;
-  color: #9ca3af;
-}
-
-@media (max-width: 768px) {
-  .footer-main {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 1rem;
-  }
-  
-  .links-section {
-    align-items: flex-start;
-    width: 100%;
-  }
-  
-  .platform-section {
-    min-width: auto;
-  }
-  
-  .app-footer {
-    padding: 1rem;
-  }
-}
-</style>
-    const canGoBack = computed(() => route.path !== '/')
-
-    const goBack = () => {
-      if (!canGoBack.value) return
-      router.back()
-    }

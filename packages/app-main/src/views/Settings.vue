@@ -1,900 +1,533 @@
 <template>
-  <div class="settings-page">
-    <div class="main-content">
-      <div class="header-row">
-        <h2>用户设置</h2>
-        <button @click="handleLogout" class="btn btn-danger">注销登录</button>
+  <main class="workspace-width workspace-page settings-page">
+    <header class="page-header settings-heading">
+      <div>
+        <h1>账号设置</h1>
+        <p>查看个人资料与偏好，管理用于内容分析的 API Key。</p>
       </div>
-      
-      <div v-if="loading" class="loading-state">
-        <p>加载中...</p>
-      </div>
+      <button v-if="user" type="button" class="btn btn-outline btn-sm" @click="openDialog('logout')">
+        <i class="bi bi-box-arrow-right" aria-hidden="true"></i> 退出登录
+      </button>
+    </header>
 
-      <div v-else-if="!getUserHash()" class="empty-state">
-        <p>⚠️ 用户信息不完整，请重新登录</p>
-        <button @click="handleLogout" class="btn btn-primary">重新登录</button>
-      </div>
+    <section v-if="!user" class="surface settings-state" aria-labelledby="signed-out-title">
+      <h2 id="signed-out-title">请先登录</h2>
+      <p>登录后可以查看账号资料和 API Key。</p>
+      <button type="button" class="btn btn-primary btn-sm" @click="$emit('request-login')">登录</button>
+    </section>
 
-      <div v-else-if="user" class="settings-container">
-        <!-- 基本信息卡片 -->
-        <div class="card">
-          <h3 class="card-title">基本信息</h3>
-          <div class="info-grid">
-            <div class="info-item">
-              <span class="info-label">显示名称</span>
-              <span class="info-value">{{ user.displayName }}</span>
+    <template v-else>
+      <div class="account-grid">
+        <section class="surface profile-panel" aria-labelledby="profile-title">
+          <header class="profile-header">
+            <span class="profile-avatar" aria-hidden="true">{{ avatarLetter }}</span>
+            <div>
+              <h2 id="profile-title">{{ displayName }}</h2>
+              <p>{{ user.email || '暂无邮箱地址' }}</p>
             </div>
-            <div class="info-item">
-              <span class="info-label">邮箱</span>
-              <span class="info-value">{{ user.email }}</span>
+          </header>
+          <dl class="profile-dates">
+            <div>
+              <dt>注册时间</dt>
+              <dd>{{ formatDate(user.registeredAt || user.created_at) }}</dd>
             </div>
-            <div class="info-item">
-              <span class="info-label">注册时间</span>
-              <span class="info-value">{{ formatDate(user.registeredAt) }}</span>
+            <div>
+              <dt>最近登录</dt>
+              <dd>{{ formatDate(user.lastLoginAt || user.last_login_at) }}</dd>
             </div>
-            <div class="info-item">
-              <span class="info-label">最后登录</span>
-              <span class="info-value">{{ formatDate(user.lastLoginAt) }}</span>
-            </div>
-          </div>
-        </div>
+          </dl>
+        </section>
 
-        <!-- API Key 管理卡片 -->
-        <div class="card">
-          <div class="card-header">
-            <h3 class="card-title">API Key 管理</h3>
-            <button @click="showAddModal = true" class="btn btn-primary">
-              <span class="icon">+</span> 添加 API Key
-            </button>
-          </div>
-
-          <div v-if="apiKeys.length === 0" class="empty-state">
-            <p>暂无 API Key，点击上方按钮添加</p>
-          </div>
-
-          <div v-else class="api-keys-list">
-            <div v-for="key in apiKeys" :key="key.id" class="api-key-item">
-              <div class="api-key-header">
-                <div class="api-key-info">
-                  <h4 class="api-key-label">
-                    {{ key.label || '未命名' }}
-                    <span v-if="key.isDefault" class="badge badge-primary">默认</span>
-                    <span v-if="!key.isEnabled" class="badge badge-gray">已禁用</span>
-                  </h4>
-                  <span class="api-key-provider">{{ getProviderName(key.provider) }}</span>
-                </div>
-                <div class="api-key-actions">
-                  <button @click="toggleKeyVisibility(key.id)" class="btn-icon" title="显示/隐藏">
-                    {{ visibleKeys.has(key.id) ? '👁️' : '👁️‍🗨️' }}
-                  </button>
-                  <button @click="editApiKey(key)" class="btn-icon" title="编辑">
-                    ✏️
-                  </button>
-                  <button @click="deleteKey(key.id)" class="btn-icon btn-danger" title="删除">
-                    🗑️
-                  </button>
-                </div>
-              </div>
-              
-              <div class="api-key-details">
-                <div class="api-key-value">
-                  <span class="info-label">API Key</span>
-                  <code class="key-display">{{ 
-                    visibleKeys.has(key.id) ? key.apiKey : maskApiKey(key.apiKey) 
-                  }}</code>
-                </div>
-                
-                <div class="api-key-meta">
-                  <div v-if="key.notes" class="meta-item">
-                    <span class="info-label">备注</span>
-                    <span class="info-value">{{ key.notes }}</span>
-                  </div>
-                  <div v-if="key.expiresAt" class="meta-item">
-                    <span class="info-label">过期时间</span>
-                    <span class="info-value">{{ formatDate(key.expiresAt) }}</span>
-                  </div>
-                  <div class="meta-item">
-                    <span class="info-label">创建时间</span>
-                    <span class="info-value">{{ formatDate(key.createdAt) }}</span>
-                  </div>
-                </div>
-              </div>
+        <section v-if="user.preferences" class="surface preference-panel" aria-labelledby="preferences-title">
+          <header class="settings-panel-header">
+            <h2 id="preferences-title"><i class="bi bi-sliders" aria-hidden="true"></i> 账号偏好</h2>
+          </header>
+          <dl class="preferences-list">
+            <div>
+              <dt>语言</dt>
+              <dd>{{ languages[user.preferences.language] || user.preferences.language || '—' }}</dd>
             </div>
-          </div>
-        </div>
-
-        <!-- 偏好设置卡片 -->
-        <div class="card" v-if="user.preferences">
-          <h3 class="card-title">偏好设置</h3>
-          <div class="info-grid">
-            <div class="info-item">
-              <span class="info-label">语言</span>
-              <span class="info-value">{{ user.preferences.language }}</span>
+            <div>
+              <dt>时区</dt>
+              <dd>{{ user.preferences.timezone || '—' }}</dd>
             </div>
-            <div class="info-item">
-              <span class="info-label">时区</span>
-              <span class="info-value">{{ user.preferences.timezone }}</span>
+            <div>
+              <dt>邮件通知</dt>
+              <dd>
+                <span class="settings-badge" :class="{ positive: user.preferences.emailNotifications === true }">
+                  {{ emailNotificationLabel }}
+                </span>
+              </dd>
             </div>
-            <div class="info-item">
-              <span class="info-label">邮件通知</span>
-              <span class="info-value">{{ user.preferences.emailNotifications ? '已启用' : '已禁用' }}</span>
-            </div>
-          </div>
-        </div>
+          </dl>
+        </section>
       </div>
 
-      <div v-else class="empty-state">
-        <p>未找到用户信息</p>
-      </div>
-    </div>
-
-    <!-- 添加/编辑 API Key 弹窗 -->
-    <div v-if="showAddModal || showEditModal" class="modal-overlay" @click.self="closeModal">
-      <div class="modal">
-        <div class="modal-header">
-          <h3>{{ showEditModal ? '编辑 API Key' : '添加 API Key' }}</h3>
-          <button @click="closeModal" class="btn-close">×</button>
-        </div>
-        
-        <div class="modal-body">
-          <div class="form-group">
-            <label>提供商 *</label>
-            <select v-model="formData.provider" required>
-              <option value="">请选择提供商</option>
-              <option value="openai">OpenAI</option>
-              <option value="anthropic">Anthropic (Claude)</option>
-              <option value="google">Google (Gemini)</option>
-              <option value="deepseek">DeepSeek</option>
-              <option value="zhipu">智谱 AI</option>
-              <option value="moonshot">月之暗面 (Kimi)</option>
-              <option value="alibaba">阿里云</option>
-              <option value="tencent">腾讯云</option>
-              <option value="baidu">百度</option>
-              <option value="other">其他</option>
-            </select>
+      <section class="surface keys-panel" aria-labelledby="keys-title" :aria-busy="loading">
+        <header class="settings-panel-header keys-header">
+          <div>
+            <h2 id="keys-title">API Key 管理</h2>
+            <p>管理 AI 服务提供商的密钥与默认配置。</p>
           </div>
-
-          <div class="form-group">
-            <label>API Key *</label>
-            <input 
-              v-model="formData.apiKey" 
-              type="password"
-              placeholder="请输入 API Key"
-              required
-            />
-          </div>
-
-          <div class="form-group">
-            <label>标签</label>
-            <input 
-              v-model="formData.label" 
-              type="text"
-              placeholder="例如：工作账号、个人账号"
-            />
-          </div>
-
-          <div class="form-group">
-            <label>备注</label>
-            <textarea 
-              v-model="formData.notes" 
-              rows="3"
-              placeholder="可选的备注信息"
-            ></textarea>
-          </div>
-
-          <div class="form-group">
-            <label>过期时间</label>
-            <input 
-              v-model="formData.expiresAt" 
-              type="datetime-local"
-            />
-          </div>
-
-          <div class="form-group-inline">
-            <label class="checkbox-label">
-              <input v-model="formData.isDefault" type="checkbox" />
-              设为默认
-            </label>
-            <label class="checkbox-label">
-              <input v-model="formData.isEnabled" type="checkbox" />
-              启用
-            </label>
-          </div>
-        </div>
-
-        <div class="modal-footer">
-          <button @click="closeModal" class="btn btn-ghost">取消</button>
-          <button @click="submitForm" class="btn btn-primary" :disabled="submitting">
-            {{ submitting ? '提交中...' : (showEditModal ? '保存' : '添加') }}
+          <button type="button" class="btn btn-primary btn-sm" :disabled="!userHash" @click="openDialog('create')">
+            <span class="add-icon" aria-hidden="true">+</span> 添加 API Key
           </button>
+        </header>
+
+        <div v-if="!userHash" class="settings-state" role="status">
+          <h3>账号信息不完整</h3>
+          <p>请退出并重新登录后管理 API Key。</p>
         </div>
+        <div v-else-if="loading" class="settings-state" role="status">
+          <span class="state-icon"><i class="bi bi-arrow-repeat" aria-hidden="true"></i></span>
+          <h3>正在加载 API Key…</h3>
+        </div>
+        <div v-else-if="listError" class="settings-state" role="status">
+          <span class="state-icon"><i class="bi bi-exclamation-circle" aria-hidden="true"></i></span>
+          <h3>API Key 列表加载失败</h3>
+          <button type="button" class="btn btn-outline btn-sm" @click="loadApiKeys">重新加载</button>
+        </div>
+        <div v-else-if="!apiKeys.length" class="settings-state">
+          <span class="state-icon"><i class="bi bi-key" aria-hidden="true"></i></span>
+          <h3>暂无 API Key</h3>
+          <p>添加 AI 服务提供商的密钥后，可将其用于内容分析。</p>
+        </div>
+
+        <template v-else>
+          <table class="keys-table">
+            <thead>
+              <tr>
+                <th scope="col">名称 / 提供商</th>
+                <th scope="col">状态</th>
+                <th scope="col">创建时间</th>
+                <th scope="col" class="key-actions-heading">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="key in apiKeys" :key="key.id">
+                <td class="key-name-cell">
+                  <div class="key-identity">
+                    <span class="key-icon"><i class="bi bi-key" aria-hidden="true"></i></span>
+                    <div>
+                      <strong>{{ key.label || providerLabel(key.provider) }}</strong>
+                      <span v-if="key.label">{{ providerLabel(key.provider) }}</span>
+                      <span v-if="key.notes" class="key-notes">{{ key.notes }}</span>
+                    </div>
+                  </div>
+                </td>
+                <td class="key-status-cell">
+                  <div class="key-badges">
+                    <span class="settings-badge" :class="{ positive: key.enabled }">{{ key.enabled ? '已启用' : '已禁用' }}</span>
+                    <span v-if="key.isDefault" class="settings-badge default">默认</span>
+                  </div>
+                </td>
+                <td class="key-date-cell">
+                  {{ formatDate(key.createdAt) }}
+                  <small v-if="key.expiresAt">到期 {{ formatDate(key.expiresAt) }}</small>
+                </td>
+                <td class="key-actions">
+                  <button type="button" class="btn btn-outline btn-sm" :aria-label="`编辑 ${key.label || providerLabel(key.provider)}`" @click="openDialog('edit', key)">编辑</button>
+                  <button type="button" class="btn btn-outline btn-sm danger-text" :aria-label="`删除 ${key.label || providerLabel(key.provider)}`" @click="openDialog('delete', key)">删除</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <footer class="keys-footer">共 {{ apiKeys.length }} 个 API Key</footer>
+        </template>
+      </section>
+    </template>
+
+    <dialog
+      ref="settingsDialog"
+      class="workspace-dialog settings-dialog"
+      aria-labelledby="settings-dialog-title"
+      @cancel="handleCancel"
+      @click.self="closeDialog"
+      @close="resetDialog"
+    >
+      <div v-if="mode" class="settings-dialog-content">
+        <button type="button" class="workspace-dialog-close" aria-label="关闭弹窗" :disabled="submitting" @click="closeDialog">×</button>
+        <header class="settings-dialog-header">
+          <h2 id="settings-dialog-title">{{ dialogTitle }}</h2>
+          <p v-if="mode === 'create'">填写服务提供商与密钥。可为密钥加上易于识别的名称。</p>
+          <p v-else-if="mode === 'edit'">编辑提供商和配置，或填写新密钥以替换现有密钥。</p>
+          <p v-else-if="mode === 'delete'">确定删除「{{ keyName }}」？已使用该密钥的分析配置可能需要更换密钥。</p>
+          <p v-else>退出后，需要重新登录才能管理账号和 API Key。</p>
+        </header>
+
+        <form @submit.prevent="submitDialog">
+          <fieldset v-if="isKeyForm" class="settings-fields" :disabled="submitting">
+            <div class="settings-field">
+              <label for="key-provider">服务提供商 <span class="required-mark">*</span></label>
+              <select id="key-provider" v-model="form.provider" required autofocus>
+                <option value="" disabled>选择服务提供商</option>
+                <option v-if="form.provider && !providers[form.provider]" :value="form.provider">{{ form.provider }}</option>
+                <option v-for="(label, provider) in providers" :key="provider" :value="provider">{{ label }}</option>
+              </select>
+            </div>
+            <div class="settings-field">
+              <label for="key-label">名称</label>
+              <input id="key-label" v-model.trim="form.label" type="text" maxlength="100" placeholder="例如：个人分析" />
+            </div>
+            <div class="settings-field full-width">
+              <label for="key-secret">API Key <span v-if="mode === 'create'" class="required-mark">*</span></label>
+              <input
+                id="key-secret"
+                v-model.trim="form.secret"
+                type="password"
+                autocomplete="new-password"
+                spellcheck="false"
+                :required="mode === 'create'"
+                :placeholder="mode === 'edit' ? '留空则保留现有密钥' : '粘贴提供商发放的密钥'"
+              />
+            </div>
+            <template v-if="mode === 'edit'">
+              <div class="settings-field full-width">
+                <label for="key-notes">备注</label>
+                <textarea id="key-notes" v-model.trim="form.notes" rows="2" maxlength="500"></textarea>
+              </div>
+              <div class="settings-field full-width">
+                <label for="key-expiry">过期时间</label>
+                <input id="key-expiry" v-model="form.expiresAt" type="datetime-local" />
+              </div>
+            </template>
+            <div class="settings-checks full-width">
+              <label><input v-model="form.isDefault" type="checkbox" /> 设为该提供商的默认密钥</label>
+              <label v-if="mode === 'edit'"><input v-model="form.enabled" type="checkbox" /> 启用密钥</label>
+            </div>
+          </fieldset>
+
+          <p v-if="formError" class="settings-error" role="alert">{{ formError }}</p>
+          <footer class="settings-dialog-actions">
+            <button type="button" class="btn btn-outline" :autofocus="!isKeyForm" :disabled="submitting" @click="closeDialog">取消</button>
+            <button type="submit" class="btn" :class="mode === 'delete' ? 'btn-danger' : 'btn-primary'" :disabled="submitting">
+              {{ submitting ? '处理中…' : submitLabel }}
+            </button>
+          </footer>
+        </form>
       </div>
-    </div>
-  </div>
+    </dialog>
+  </main>
 </template>
 
-<script>
-import { ref, computed, onMounted } from 'vue'
+<script setup>
+import { computed, nextTick, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { useAuth } from '../composables/useAuth'
 import { api } from '../api'
+import { useAuth } from '../composables/useAuth'
 import { showNotification } from '../utils/notification'
 
-export default {
-  setup() {
-    const router = useRouter()
-    const { currentUser, logout } = useAuth()
-    
-    const loading = ref(true)
-    const user = computed(() => currentUser.value)
-    const apiKeys = ref([])
-    const visibleKeys = ref(new Set())
-    
-    // 获取用户 hash（兼容多种字段名）
-    const getUserHash = () => {
-      const u = user.value
-      if (!u) {
-        console.log('getUserHash: 用户对象为空')
-        return null
-      }
-      
-      // 打印用户对象的所有键
-      console.log('用户对象的所有键:', Object.keys(u))
-      console.log('用户对象完整内容:', JSON.stringify(u, null, 2))
-      
-      // 尝试多种可能的字段名：userId, user_id, userHash, user_hash, hash, id
-      const hash = u.userId || u.user_id || u.userHash || u.user_hash || u.hash || u.id || null
-      console.log('获取到的 hash:', hash)
-      
-      return hash
-    }
-    
-    // 弹窗状态
-    const showAddModal = ref(false)
-    const showEditModal = ref(false)
-    const submitting = ref(false)
-    const editingKeyId = ref(null)
-    
-    // 表单数据
-    const formData = ref({
-      provider: '',
-      apiKey: '',
-      label: '',
-      notes: '',
-      expiresAt: '',
-      isDefault: false,
-      isEnabled: true
-    })
+defineEmits(['request-login'])
 
-    // 提供商名称映射
-    const getProviderName = (provider) => {
-      const names = {
-        openai: 'OpenAI',
-        anthropic: 'Anthropic (Claude)',
-        google: 'Google (Gemini)',
-        deepseek: 'DeepSeek',
-        zhipu: '智谱 AI',
-        moonshot: '月之暗面 (Kimi)',
-        alibaba: '阿里云',
-        tencent: '腾讯云',
-        baidu: '百度',
-        other: '其他'
-      }
-      return names[provider] || provider
-    }
-    
-    // 格式化日期
-    const formatDate = (dateString) => {
-      if (!dateString) return '-'
-      const date = new Date(dateString)
-      return date.toLocaleString('zh-CN', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit'
-      })
-    }
+const router = useRouter()
+const { currentUser: user, logout } = useAuth()
+const userHash = computed(() => {
+  const account = user.value
+  return account?.userId || account?.user_id || account?.userHash || account?.user_hash || account?.hash || account?.id
+})
+const displayName = computed(() => user.value?.displayName || user.value?.display_name || user.value?.email || '我的账号')
+const avatarLetter = computed(() => Array.from(displayName.value)[0].toUpperCase())
+const emailNotificationLabel = computed(() => {
+  const enabled = user.value?.preferences?.emailNotifications
+  return enabled == null ? '未设置' : enabled ? '已启用' : '已关闭'
+})
 
-    // 遮罩 API Key
-    const maskApiKey = (key) => {
-      if (!key) return ''
-      if (key.length <= 8) return '********'
-      return key.substring(0, 4) + '********' + key.substring(key.length - 4)
-    }
+const languages = { 'zh-CN': '简体中文', 'zh-TW': '繁體中文', en: 'English', 'en-US': 'English' }
+const providers = {
+  openai: 'OpenAI',
+  anthropic: 'Anthropic (Claude)',
+  google: 'Google (Gemini)',
+  deepseek: 'DeepSeek',
+  zhipu: '智谱 AI',
+  moonshot: '月之暗面 (Kimi)',
+  alibaba: '阿里云',
+  tencent: '腾讯云',
+  baidu: '百度',
+  other: '其他'
+}
+const dateFormat = new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', timeStyle: 'short', hourCycle: 'h23' })
+const apiKeys = ref([])
+const loading = ref(false)
+const listError = ref(false)
+const settingsDialog = ref(null)
+const mode = ref('')
+const activeKey = ref(null)
+const form = ref(blankForm())
+const formError = ref('')
+const submitting = ref(false)
+let listRequest = 0
 
-    // 切换 Key 可见性
-    const toggleKeyVisibility = (keyId) => {
-      if (visibleKeys.value.has(keyId)) {
-        visibleKeys.value.delete(keyId)
-      } else {
-        visibleKeys.value.add(keyId)
-      }
-    }
+const isKeyForm = computed(() => mode.value === 'create' || mode.value === 'edit')
+const keyName = computed(() => activeKey.value?.label || providerLabel(activeKey.value?.provider))
+const dialogTitle = computed(() => ({
+  create: '添加 API Key', edit: '编辑 API Key', delete: '删除 API Key', logout: '退出登录'
+})[mode.value])
+const submitLabel = computed(() => ({
+  create: '添加密钥', edit: '保存修改', delete: '确认删除', logout: '退出登录'
+})[mode.value])
 
-    // 加载 API Keys
-    const loadApiKeys = async () => {
-      const userHash = getUserHash()
-      if (!userHash) {
-        console.warn('无法获取用户 hash，跳过加载 API Keys')
-        loading.value = false
-        return
-      }
+function blankForm() {
+  return { provider: '', secret: '', label: '', notes: '', expiresAt: '', isDefault: false, enabled: true }
+}
 
-      try {
-        const response = await api.getUserApiKeys(userHash)
-        if (response.success) {
-          apiKeys.value = response.data || []
-        } else {
-          console.error('API 返回失败:', response)
-          showNotification(response.message || '加载 API Keys 失败', 'error')
-        }
-      } catch (error) {
-        console.error('加载 API Keys 失败:', error)
-        const errorMsg = error.response?.data?.message || error.message || '加载 API Keys 失败'
-        showNotification(errorMsg, 'error')
-      } finally {
-        loading.value = false
-      }
-    }
+function providerLabel(provider) {
+  return providers[provider] || provider || '未知提供商'
+}
 
-    // 重置表单
-    const resetForm = () => {
-      formData.value = {
-        provider: '',
-        apiKey: '',
-        label: '',
-        notes: '',
-        expiresAt: '',
-        isDefault: false,
-        isEnabled: true
-      }
-      editingKeyId.value = null
-    }
+function parseDate(value) {
+  return value ? new Date(String(value).replace(' ', 'T')) : new Date(NaN)
+}
 
-    // 关闭弹窗
-    const closeModal = () => {
-      showAddModal.value = false
-      showEditModal.value = false
-      resetForm()
-    }
+function formatDate(value) {
+  const date = parseDate(value)
+  return Number.isFinite(date.getTime()) ? dateFormat.format(date) : '—'
+}
 
-    // 编辑 API Key
-    const editApiKey = (key) => {
-      formData.value = {
-        provider: key.provider || '',
-        apiKey: key.apiKey || '',
-        label: key.label || '',
-        notes: key.notes || '',
-        expiresAt: key.expiresAt ? new Date(key.expiresAt).toISOString().slice(0, 16) : '',
-        isDefault: key.isDefault || false,
-        isEnabled: key.isEnabled !== false
-      }
-      editingKeyId.value = key.id
-      showEditModal.value = true
-    }
+function dateForInput(value) {
+  const date = parseDate(value)
+  if (!Number.isFinite(date.getTime())) return ''
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16)
+}
 
-    // 提交表单
-    const submitForm = async () => {
-      if (!formData.value.provider || !formData.value.apiKey) {
-        showNotification('请填写必填项', 'error')
-        return
-      }
-
-      submitting.value = true
-      try {
-        const data = {
-          provider: formData.value.provider,
-          api_key: formData.value.apiKey,
-          label: formData.value.label,
-          notes: formData.value.notes,
-          expires_at: formData.value.expiresAt || '',
-          is_default: formData.value.isDefault,
-          is_enabled: formData.value.isEnabled
-        }
-
-        if (showEditModal.value && editingKeyId.value) {
-          // 更新
-          const response = await api.updateApiKey(editingKeyId.value, data)
-          if (response.success) {
-            showNotification('API Key 更新成功', 'success')
-            await loadApiKeys()
-            closeModal()
-          }
-        } else {
-          // 新增
-          const userHash = getUserHash()
-          if (!userHash) {
-            showNotification('无法获取用户信息', 'error')
-            return
-          }
-          data.user_hash = userHash
-          const response = await api.createApiKey(data)
-          if (response.success) {
-            showNotification('API Key 添加成功', 'success')
-            await loadApiKeys()
-            closeModal()
-          }
-        }
-      } catch (error) {
-        console.error('提交失败:', error)
-        showNotification(error.response?.data?.message || '操作失败', 'error')
-      } finally {
-        submitting.value = false
-      }
-    }
-
-    // 删除 API Key
-    const deleteKey = async (keyId) => {
-      if (!confirm('确定要删除这个 API Key 吗？')) {
-        return
-      }
-
-      try {
-        const response = await api.deleteApiKey(keyId)
-        if (response.success) {
-          showNotification('API Key 删除成功', 'success')
-          await loadApiKeys()
-        }
-      } catch (error) {
-        console.error('删除失败:', error)
-        showNotification('删除失败', 'error')
-      }
-    }
-    
-    // 注销登录
-    const handleLogout = async () => {
-      if (confirm('确定要注销登录吗？')) {
-        await logout()
-        router.push('/')
-      }
-    }
-
-    onMounted(() => {
-      // 调试：打印用户信息结构
-      console.log('当前用户信息:', user.value)
-      console.log('用户 Hash:', getUserHash())
-      
-      loadApiKeys()
-    })
-    
-    return { 
-      loading,
-      user, 
-      apiKeys,
-      visibleKeys,
-      showAddModal,
-      showEditModal,
-      submitting,
-      formData,
-      formatDate, 
-      handleLogout,
-      getProviderName,
-      maskApiKey,
-      toggleKeyVisibility,
-      editApiKey,
-      deleteKey,
-      closeModal,
-      submitForm,
-      getUserHash
-    }
+function normalizeKey(key) {
+  return {
+    id: key.id,
+    provider: key.provider,
+    label: key.label,
+    notes: key.notes,
+    isDefault: Boolean(key.is_default ?? key.isDefault),
+    enabled: (key.is_enabled ?? key.isEnabled) !== false,
+    createdAt: key.created_at ?? key.createdAt,
+    expiresAt: key.expires_at ?? key.expiresAt
   }
 }
+
+async function loadApiKeys() {
+  const request = ++listRequest
+  const hash = userHash.value
+  listError.value = false
+  loading.value = Boolean(hash)
+  if (!hash) return
+
+  try {
+    const response = await api.getUserApiKeys(hash)
+    if (!response?.success || (response.data != null && !Array.isArray(response.data))) {
+      throw new Error('无法读取 API Key 列表')
+    }
+    if (request === listRequest) apiKeys.value = (response.data || []).map(normalizeKey)
+  } catch {
+    if (request === listRequest) listError.value = true
+  } finally {
+    if (request === listRequest) loading.value = false
+  }
+}
+
+async function openDialog(nextMode, key = null) {
+  if (settingsDialog.value?.open || submitting.value) return
+  resetDialog()
+  mode.value = nextMode
+  activeKey.value = key
+  if (nextMode === 'edit' && key) {
+    form.value = {
+      provider: key.provider || '',
+      secret: '',
+      label: key.label || '',
+      notes: key.notes || '',
+      expiresAt: dateForInput(key.expiresAt),
+      isDefault: key.isDefault,
+      enabled: key.enabled
+    }
+  }
+  await nextTick()
+  settingsDialog.value?.showModal()
+}
+
+function handleCancel(event) {
+  if (submitting.value) event.preventDefault()
+}
+
+function closeDialog() {
+  if (!submitting.value) settingsDialog.value?.close()
+}
+
+function resetDialog() {
+  mode.value = ''
+  activeKey.value = null
+  form.value = blankForm()
+  formError.value = ''
+}
+
+function mutationError(error, action) {
+  const status = error.response?.status
+  if (status === 404 || status === 405) return `当前后端未提供「${action}」接口。`
+  if (status === 401 || status === 403) return '登录已失效或权限不足，请重新登录后再试。'
+  if (error.code === 'ECONNABORTED') return '请求超时。可关闭弹窗并刷新列表查看结果。'
+  if (typeof error.response?.data?.message === 'string' && error.response.data.message.includes('标签已存在')) return '该提供商下已有同名密钥，请更换名称。'
+  return `${action}失败，请稍后重试。`
+}
+
+async function submitDialog() {
+  if (submitting.value) return
+  const action = mode.value
+  const hash = userHash.value
+  if (!hash && action !== 'logout') return
+  formError.value = ''
+  submitting.value = true
+
+  try {
+    if (action === 'logout') {
+      await logout()
+      settingsDialog.value?.close()
+      await router.push('/')
+      return
+    }
+
+    let response
+    if (action === 'delete') {
+      response = await api.deleteApiKey(activeKey.value.id)
+    } else {
+      const { provider, secret, label, notes, expiresAt, isDefault, enabled } = form.value
+      if (!provider || (action === 'create' && !secret)) {
+        formError.value = '请填写服务提供商和 API Key。'
+        return
+      }
+      const data = { provider, label, is_default: isDefault }
+      if (secret) data.api_key = secret
+      if (action === 'edit') {
+        const expiry = parseDate(expiresAt)
+        data.expires_at = Number.isFinite(expiry.getTime()) ? expiry.toISOString() : ''
+        data.notes = notes
+        data.is_enabled = enabled
+        response = await api.updateApiKey(activeKey.value.id, data)
+      } else {
+        response = await api.createApiKey({ ...data, user_hash: hash })
+      }
+    }
+
+    if (!response?.success) throw new Error('接口未确认修改成功')
+    settingsDialog.value?.close()
+    showNotification(action === 'delete' ? 'API Key 已删除' : action === 'edit' ? 'API Key 已更新' : 'API Key 已添加')
+    if (userHash.value === hash) void loadApiKeys()
+  } catch (error) {
+    formError.value = mutationError(error, dialogTitle.value)
+  } finally {
+    submitting.value = false
+  }
+}
+
+watch(userHash, () => {
+  apiKeys.value = []
+  settingsDialog.value?.close()
+  void loadApiKeys()
+}, { immediate: true })
 </script>
 
 <style scoped>
-.settings-page { 
-  padding: 1rem;
-}
-
-.main-content {
-  max-width: 960px;
-  margin: 0 auto;
-}
-
-.header-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.5rem;
-}
-
-.header-row h2 {
-  margin: 0;
-}
-
-.settings-container {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-
-.loading-state,
-.empty-state {
-  text-align: center;
-  padding: 3rem 1rem;
-  color: var(--muted-2, #6b7280);
-}
-
-.card {
-  background: var(--card, #ffffff);
-  border: 1px solid var(--border, rgba(15, 23, 42, 0.06));
-  border-radius: 8px;
-  padding: 1.5rem;
-  box-shadow: var(--shadow-sm, 0 1px 6px rgba(16, 24, 40, 0.06));
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.5rem;
-}
-
-.card-title {
-  font-size: 1.1rem;
-  font-weight: 600;
-  margin: 0;
-  color: var(--muted, #374151);
-}
-
-.info-grid {
+.settings-heading .btn { flex-shrink: 0; }
+.account-grid { display: grid; grid-template-columns: 1.45fr 1fr; gap: 1rem; margin-bottom: 1.25rem; }
+.account-grid > :only-child { grid-column: 1 / -1; }
+.profile-panel { padding: 1.15rem 1.25rem; }
+.profile-header { display: flex; align-items: center; gap: .8rem; margin-bottom: 1rem; min-width: 0; }
+.profile-avatar, .state-icon, .key-icon {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1rem;
+  place-items: center;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: 9px;
 }
+.profile-avatar { flex: 0 0 51px; height: 51px; font-size: 1.35rem; font-weight: 750; }
+.profile-header h2, .settings-panel-header h2, .settings-state h2, .settings-state h3 { margin: 0; }
+.profile-header h2 { font-size: 1.22rem; overflow-wrap: anywhere; }
+.profile-header p { margin: .2rem 0 0; color: var(--muted-2); font-size: .85rem; overflow-wrap: anywhere; }
+.profile-dates, .preferences-list { margin: 0; }
+.profile-dates { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; padding-top: .88rem; border-top: 1px solid var(--border); }
+.profile-dates dt, .preferences-list dt { color: var(--muted-2); font-size: .8rem; }
+.profile-dates dd, .preferences-list dd { margin: 0; color: var(--text); font-size: .85rem; font-weight: 620; overflow-wrap: anywhere; }
+.profile-dates dd { margin-top: .3rem; font-variant-numeric: tabular-nums; }
+.settings-panel-header { padding: 1.05rem 1.25rem; }
+.settings-panel-header h2 { font-size: 1.12rem; }
+.preference-panel .settings-panel-header { padding-bottom: .6rem; }
+.preference-panel h2 i { margin-right: .28rem; color: var(--accent); font-size: .9rem; }
+.preferences-list { padding: 0 1.25rem .65rem; }
+.preferences-list > div { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .46rem 0; }
+.preferences-list > div + div { border-top: 1px solid var(--border); }
 
-.info-item {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
+.keys-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .75rem; }
+.keys-header p, .settings-state p { margin: .35rem 0 0; color: var(--muted-2); font-size: .83rem; line-height: 1.55; }
+.add-icon { font-size: 1.05rem; line-height: 1; }
+.settings-state { display: grid; justify-items: center; gap: .55rem; padding: 2.4rem 1.15rem; text-align: center; }
+.keys-panel .settings-state { min-height: 180px; align-content: center; border-top: 1px solid var(--border); }
+.settings-state h2, .settings-state h3 { font-size: .98rem; }
+.settings-state p { margin: 0; }
+.state-icon { width: 40px; height: 40px; font-size: 1.05rem; }
 
-.info-label {
-  font-size: 0.875rem;
-  color: var(--muted-2, #6b7280);
-  font-weight: 500;
-}
+.keys-table { width: 100%; border-collapse: collapse; text-align: left; }
+.keys-table th, .keys-table td { padding: .75rem 1.25rem; border-top: 1px solid var(--border); }
+.keys-table th { background: #fafbfe; color: var(--muted-2); font-size: .76rem; font-weight: 650; }
+.keys-table td { color: var(--muted); font-size: .81rem; }
+.key-identity { display: flex; align-items: center; gap: .6rem; }
+.key-icon { flex: 0 0 34px; height: 34px; }
+.key-identity strong, .key-identity span:not(.key-icon), .key-date-cell small { display: block; overflow-wrap: anywhere; }
+.key-identity strong { color: var(--text); font-size: .88rem; }
+.key-identity span:not(.key-icon), .key-date-cell small { margin-top: .18rem; color: var(--muted-2); font-size: .75rem; }
+.key-badges { display: flex; flex-wrap: wrap; gap: .3rem; }
+.settings-badge { display: inline-flex; align-items: center; border-radius: 5px; padding: .17rem .42rem; background: #edf0f6; color: #495873; font-size: .72rem; font-weight: 650; white-space: nowrap; }
+.settings-badge.positive { background: #e5f6ef; color: #13634e; }
+.settings-badge.default { background: var(--accent-soft); color: var(--accent); }
+.key-date-cell { font-variant-numeric: tabular-nums; }
+.keys-table .key-actions-heading, .keys-table .key-actions { text-align: right; white-space: nowrap; }
+.key-actions button + button { margin-left: .4rem; }
+.danger-text { color: #a82632; }
+.danger-text:hover { background: #fceef0; }
+.keys-footer { padding: .75rem 1.25rem; border-top: 1px solid var(--border); color: var(--muted-2); font-size: .77rem; }
 
-.info-value {
-  font-size: 1rem;
-  color: var(--muted, #374151);
-  word-break: break-word;
-}
-
-/* API Keys List */
-.api-keys-list {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.api-key-item {
-  border: 1px solid var(--border, rgba(15, 23, 42, 0.06));
+.settings-dialog { --dialog-width: 510px; }
+.settings-dialog-content { padding: clamp(1rem, 4vw, 1.55rem); }
+.settings-dialog-header { padding-right: 1.75rem; margin-bottom: 1.25rem; }
+.settings-dialog-header h2 { margin: 0; font-size: 1.4rem; letter-spacing: -.025em; }
+.settings-dialog-header p { margin: .38rem 0 0; color: var(--muted-2); font-size: .83rem; line-height: 1.6; overflow-wrap: anywhere; }
+.settings-fields { min-width: 0; display: grid; grid-template-columns: 1fr 1fr; gap: .9rem; margin: 0; padding: 0; border: 0; }
+.settings-field { min-width: 0; display: grid; gap: .35rem; }
+.settings-field label, .settings-checks { color: var(--text); font-size: .82rem; font-weight: 650; }
+.settings-field :is(input, select, textarea) {
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  padding: .48rem .65rem;
+  border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 1rem;
-  background: var(--bg, #f8fafc);
-  transition: all 0.2s;
+  background: var(--card);
+  color: var(--text);
+  font: inherit;
 }
+.settings-field textarea { resize: vertical; }
+.settings-field input::placeholder { color: var(--muted-2); font-size: .82rem; }
+.full-width { grid-column: 1 / -1; }
+.required-mark { color: #a82632; }
+.settings-checks { display: flex; flex-wrap: wrap; gap: .45rem 1rem; }
+.settings-checks label { display: inline-flex; align-items: center; gap: .35rem; }
+.settings-checks input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
+.settings-dialog-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: .5rem; margin-top: 1.2rem; }
+.settings-error { margin: .85rem 0 0; padding: .55rem .7rem; border-radius: 8px; background: #fceef0; color: #a82632; font-size: .82rem; }
+.btn-danger { background: #ad2635; color: white; }
+.btn-danger:hover:not(:disabled) { background: #8d1e2b; }
 
-.api-key-item:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+@media (max-width: 700px) {
+  .account-grid { grid-template-columns: 1fr; }
+  .keys-table th, .keys-table td { padding-inline: .75rem; }
 }
-
-.api-key-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 0.75rem;
+@media (max-width: 570px) {
+  .keys-table, .keys-table tbody { display: block; }
+  .keys-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .keys-table tbody tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .55rem .35rem; padding: .75rem 1rem; border-top: 1px solid var(--border); }
+  .keys-table tbody td { display: block; border: 0; padding: 0; }
+  .key-name-cell { grid-column: 1; }
+  .key-status-cell { grid-column: 2; align-self: center; }
+  .key-date-cell { grid-column: 1; align-self: center; }
+  .key-actions { grid-column: 2; }
 }
-
-.api-key-info {
-  flex: 1;
-}
-
-.api-key-label {
-  font-size: 1rem;
-  font-weight: 600;
-  margin: 0 0 0.25rem 0;
-  color: var(--muted, #374151);
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.api-key-provider {
-  font-size: 0.875rem;
-  color: var(--muted-2, #6b7280);
-}
-
-.api-key-actions {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.api-key-details {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.api-key-value {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.key-display {
-  font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
-  font-size: 0.875rem;
-  background: white;
-  border: 1px solid var(--border, rgba(15, 23, 42, 0.06));
-  padding: 0.5rem 0.75rem;
-  border-radius: 4px;
-  color: var(--muted, #374151);
-  word-break: break-all;
-}
-
-.api-key-meta {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 0.75rem;
-}
-
-.meta-item {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-/* Badges */
-.badge {
-  display: inline-block;
-  padding: 0.125rem 0.5rem;
-  border-radius: 12px;
-  font-size: 0.75rem;
-  font-weight: 500;
-}
-
-.badge-primary {
-  background: #3b82f6;
-  color: white;
-}
-
-.badge-gray {
-  background: #6b7280;
-  color: white;
-}
-
-/* Buttons */
-.btn {
-  padding: 0.625rem 1.25rem;
-  border-radius: 6px;
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  border: none;
-  transition: all 0.2s;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn-primary {
-  background: #3b82f6;
-  color: white;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: #2563eb;
-}
-
-.btn-danger {
-  background: #dc2626;
-  color: white;
-}
-
-.btn-danger:hover:not(:disabled) {
-  background: #b91c1c;
-}
-
-.btn-ghost {
-  background: transparent;
-  color: var(--muted, #374151);
-}
-
-.btn-ghost:hover {
-  background: var(--bg, #f1f5f9);
-}
-
-.btn-icon {
-  background: transparent;
-  border: none;
-  padding: 0.375rem;
-  cursor: pointer;
-  border-radius: 4px;
-  font-size: 1.125rem;
-  transition: all 0.2s;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.btn-icon:hover {
-  background: var(--bg, #e2e8f0);
-}
-
-.btn-icon.btn-danger:hover {
-  background: #fee2e2;
-}
-
-.icon {
-  font-size: 1.25rem;
-  line-height: 1;
-}
-
-/* Modal */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 1rem;
-}
-
-.modal {
-  background: white;
-  border-radius: 12px;
-  width: 100%;
-  max-width: 540px;
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.5rem;
-  border-bottom: 1px solid var(--border, rgba(15, 23, 42, 0.06));
-}
-
-.modal-header h3 {
-  margin: 0;
-  font-size: 1.25rem;
-  font-weight: 600;
-}
-
-.btn-close {
-  background: transparent;
-  border: none;
-  font-size: 2rem;
-  line-height: 1;
-  cursor: pointer;
-  color: var(--muted-2, #6b7280);
-  padding: 0;
-  width: 2rem;
-  height: 2rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  transition: all 0.2s;
-}
-
-.btn-close:hover {
-  background: var(--bg, #f1f5f9);
-}
-
-.modal-body {
-  padding: 1.5rem;
-}
-
-.modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.75rem;
-  padding: 1.5rem;
-  border-top: 1px solid var(--border, rgba(15, 23, 42, 0.06));
-}
-
-/* Form */
-.form-group {
-  margin-bottom: 1.25rem;
-}
-
-.form-group label {
-  display: block;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--muted, #374151);
-  margin-bottom: 0.5rem;
-}
-
-.form-group input,
-.form-group select,
-.form-group textarea {
-  width: 100%;
-  padding: 0.625rem 0.875rem;
-  border: 1px solid var(--border, rgba(15, 23, 42, 0.15));
-  border-radius: 6px;
-  font-size: 0.875rem;
-  transition: all 0.2s;
-  font-family: inherit;
-}
-
-.form-group input:focus,
-.form-group select:focus,
-.form-group textarea:focus {
-  outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
-.form-group textarea {
-  resize: vertical;
-}
-
-.form-group-inline {
-  display: flex;
-  gap: 1.5rem;
-  margin-bottom: 1.25rem;
-}
-
-.checkbox-label {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.875rem;
-  color: var(--muted, #374151);
-  cursor: pointer;
-  user-select: none;
-}
-
-.checkbox-label input[type="checkbox"] {
-  width: auto;
-  cursor: pointer;
-}
-
-@media (max-width: 768px) {
-  .settings-page {
-    padding: 0.5rem;
-  }
-
-  .header-row {
-    flex-direction: column;
-    gap: 1rem;
-    align-items: stretch;
-  }
-
-  .info-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .api-key-header {
-    flex-direction: column;
-    gap: 0.75rem;
-  }
-
-  .api-key-actions {
-    justify-content: flex-start;
-  }
-
-  .form-group-inline {
-    flex-direction: column;
-    gap: 0.75rem;
-  }
+@media (max-width: 390px) {
+  .settings-heading { gap: .65rem; }
+  .settings-fields { grid-template-columns: 1fr; gap: .7rem; }
 }
 </style>

@@ -30,7 +30,11 @@ apiClient.interceptors.response.use(
     return response.data
   },
   error => {
-    console.error('API Error:', error)
+    if (error.config?.url?.startsWith('/apikeys')) {
+      console.error('API Key request failed', error.response?.status || error.code)
+    } else {
+      console.error('API Error:', error)
+    }
     return Promise.reject(error)
   }
 )
@@ -60,13 +64,60 @@ export const api = {
   summarizeSRT(data) {
     return apiClient.post('/ai/summarize-srt', data)
   },
+  summarizeStreamer(streamerId, data = {}) {
+    return apiClient.post(`/streamers/${encodeURIComponent(streamerId)}/resummarize`, data)
+  },
+
+  // Clip report / billing interfaces
+  analyzeClipReport(data = {}) {
+    return apiClient.post('/clip-reports/analyze', data)
+  },
+  getClipReportStatus(reportId) {
+    return apiClient.get(`/clip-reports/${encodeURIComponent(reportId)}/status`)
+  },
+  getClipReportsMarketplace(params = {}) {
+    return apiClient.get('/clip-reports/marketplace', { params })
+  },
+  getClipReportDetail(reportId) {
+    return apiClient.get(`/clip-reports/${encodeURIComponent(reportId)}`)
+  },
+  getClipReportUnlockQuote(reportId, data = {}) {
+    return apiClient.post(`/clip-reports/${encodeURIComponent(reportId)}/unlock-quote`, data)
+  },
+  unlockClipReport(reportId, data = {}) {
+    return apiClient.post(`/clip-reports/${encodeURIComponent(reportId)}/unlock`, data)
+  },
+  getUserPointsWallet() {
+    return apiClient.get('/user/points/wallet')
+  },
+  getUserPointsTransactions(params = {}) {
+    return apiClient.get('/user/points/transactions', { params })
+  },
+  rechargePoints(data = {}) {
+    return apiClient.post('/user/points/recharge', data)
+  },
+  getUserNotifications(params = {}) {
+    return apiClient.get('/user/notifications', { params })
+  },
+  getBillingConfig() {
+    return apiClient.get('/admin/billing/config')
+  },
+  updateBillingConfig(data = {}) {
+    return apiClient.put('/admin/billing/config', data)
+  },
+  getRechargePackages() {
+    return apiClient.get('/admin/recharge-packages')
+  },
+  createOrUpdateRechargePackage(data = {}) {
+    return apiClient.post('/admin/recharge-packages', data)
+  },
   
   // API Key 管理接口
   createApiKey(data) {
-    return apiClient.post('/apikeys', data)
+    return apiClient.post('/apikeys', data, { timeout: 15_000 })
   },
   getUserApiKeys(userHash) {
-    return apiClient.get(`/apikeys/user/${userHash}`)
+    return apiClient.get(`/apikeys/user/${encodeURIComponent(userHash)}`, { timeout: 15_000 })
   },
   getApiKeysByProvider(userHash, provider) {
     return apiClient.get(`/apikeys/user/${userHash}/provider/${provider}`)
@@ -75,10 +126,10 @@ export const api = {
     return apiClient.get(`/apikeys/${id}`)
   },
   updateApiKey(id, data) {
-    return apiClient.put(`/apikeys/${id}`, data)
+    return apiClient.put(`/apikeys/${id}`, data, { timeout: 15_000 })
   },
   deleteApiKey(id) {
-    return apiClient.delete(`/apikeys/${id}`)
+    return apiClient.delete(`/apikeys/${id}`, { timeout: 15_000 })
   },
   deleteAllUserApiKeys(userHash) {
     return apiClient.delete(`/apikeys/user/${userHash}`)

@@ -9,11 +9,16 @@ import './styles/global.css'
 
 const router = createRouter({
   history: createWebHistory(),
+  scrollBehavior(to, from, savedPosition) {
+    if (savedPosition) return savedPosition
+    if (to.hash === '#clip-market') return { el: to.hash, top: 82 }
+    return { top: 0 }
+  },
   routes: [
     { path: '/', component: Home },
-    { path: '/settings', component: Settings },
-    { path: '/privacy', component: Privacy },
-    { path: '/terms', component: Terms },
+    { path: '/settings', name: 'settings', component: Settings },
+    { path: '/privacy', name: 'privacy', component: Privacy },
+    { path: '/terms', name: 'terms', component: Terms },
     { path: '/streamer/:streamer_id', name: 'streamer-detail', component: () => import('./views/StreamerDetail.vue') },
     { path: '/recording/:video_id', name: 'recording', component: () => import('./views/RecordingDetail.vue') }
   ]

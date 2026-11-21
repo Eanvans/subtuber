@@ -1,201 +1,159 @@
 <template>
-  <aside class="sidebar-panel">
-    <div class="sidebar-header">
-      <h3>{{ title }}</h3>
-      <button v-if="showAddButton" class="btn-add" @click="$emit('add-click')">{{ addButtonText }}</button>
-    </div>
+  <section class="subscription-panel" aria-labelledby="subscriptions-title">
+    <header class="subscription-header">
+      <h2 id="subscriptions-title" class="workspace-nav-label">我的订阅</h2>
+      <button type="button" class="sidebar-add" aria-label="添加订阅" title="添加订阅" @click="$emit('add-click')">
+        <span aria-hidden="true">+</span>
+      </button>
+    </header>
 
-    <div v-if="loading" class="sidebar-loading">{{ loadingText }}</div>
-    <div v-else-if="!items.length" class="sidebar-empty">{{ emptyText }}</div>
-    <nav v-else class="subscription-list" aria-label="我的订阅列表">
-      <router-link
+    <div v-if="loading" class="sidebar-empty" role="status">正在读取订阅…</div>
+    <div v-else-if="error" class="sidebar-empty">
+      <p>订阅读取失败</p>
+      <button type="button" @click="$emit('retry')">重试</button>
+    </div>
+    <div v-else-if="!loggedIn" class="sidebar-empty">
+      <i class="bi bi-bookmark" aria-hidden="true"></i>
+      <p>登录后查看订阅的主播与回放</p>
+      <button type="button" @click="$emit('login')">登录账号 <span aria-hidden="true">→</span></button>
+    </div>
+    <div v-else-if="!items.length" class="sidebar-empty">
+      <i class="bi bi-bookmark" aria-hidden="true"></i>
+      <p>还没有订阅主播</p>
+      <button type="button" @click="$emit('add-click')">添加订阅 <span aria-hidden="true">→</span></button>
+    </div>
+    <nav v-else class="workspace-nav subscription-list" aria-label="订阅主播">
+      <RouterLink
         v-for="streamer in items"
         :key="streamer.id"
-        :to="{ name: detailRouteName, params: { streamer_id: streamer.id } }"
-        class="subscription-item"
-        :class="{ active: streamer.id === activeId }"
+        :to="{ name: 'streamer-detail', params: { streamer_id: streamer.id } }"
+        :class="{ selected: String(streamer.id) === activeId }"
+        @click="$emit('navigate')"
       >
-        <img
-          v-if="streamer.profile_image_url"
-          :src="streamer.profile_image_url"
-          alt="avatar"
-          class="subscription-avatar"
-        />
-        <div v-else class="subscription-avatar placeholder">{{ streamer.name?.slice(0, 1) || '?' }}</div>
-        <div class="subscription-meta">
-          <div class="subscription-name">{{ streamer.name || streamer.id }}</div>
-          <div class="subscription-id">ID: {{ streamer.id }}</div>
-        </div>
-      </router-link>
+        <span class="subscription-avatar" aria-hidden="true">
+          {{ String(streamer.name || streamer.id || '?').slice(0, 1) }}
+          <img v-if="streamer.profile_image_url" :src="streamer.profile_image_url" alt="" loading="lazy" @error="$event.currentTarget.hidden = true" />
+        </span>
+        <span class="subscription-name">{{ streamer.name || streamer.id }}</span>
+      </RouterLink>
     </nav>
-  </aside>
+  </section>
 </template>
 
-<script>
-export default {
-  name: 'SubscriptionSidebar',
-  props: {
-    title: {
-      type: String,
-      default: '我的订阅'
-    },
-    items: {
-      type: Array,
-      default: () => []
-    },
-    loading: {
-      type: Boolean,
-      default: false
-    },
-    loadingText: {
-      type: String,
-      default: '加载中...'
-    },
-    emptyText: {
-      type: String,
-      default: '暂时还没有订阅主播'
-    },
-    activeId: {
-      type: String,
-      default: ''
-    },
-    showAddButton: {
-      type: Boolean,
-      default: false
-    },
-    addButtonText: {
-      type: String,
-      default: '+ 订阅'
-    },
-    detailRouteName: {
-      type: String,
-      default: 'streamer-detail'
-    }
-  },
-  emits: ['add-click']
-}
+<script setup>
+defineProps({
+  items: { type: Array, default: () => [] },
+  activeId: { type: String, default: '' },
+  loading: Boolean,
+  error: Boolean,
+  loggedIn: Boolean
+})
+defineEmits(['add-click', 'login', 'navigate', 'retry'])
 </script>
 
 <style scoped>
-.sidebar-panel {
-  background: var(--card, #fff);
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  padding: 1rem;
-  height: var(--sidebar-height, 80vh);
+.subscription-panel {
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  padding-top: 1rem;
+  border-top: 1px solid var(--sidebar-border);
 }
 
-.sidebar-header {
+.subscription-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.5rem;
+  gap: .5rem;
+  padding-right: .3rem;
+  margin-bottom: .55rem;
 }
 
-.sidebar-header h3 {
-  margin: 0;
-  font-size: 1.15rem;
-  color: #1f2937;
+.subscription-header h2 {
+  margin-bottom: 0;
 }
 
-.btn-add {
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  background: #fff;
-  color: #374151;
-  font-size: 0.85rem;
-  padding: 0.35rem 0.6rem;
+.sidebar-add {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 7px;
+  border: 1px solid var(--sidebar-border);
+  background: transparent;
+  color: #e2e7fb;
+  font-size: 1.2rem;
+  line-height: 1;
   cursor: pointer;
 }
 
-.btn-add:hover {
-  border-color: #3b82f6;
-  color: #2563eb;
+.sidebar-add:hover {
+  background: var(--sidebar-hover);
 }
 
-.sidebar-loading,
 .sidebar-empty {
-  margin-top: 0.8rem;
-  color: #6b7280;
-  font-size: 0.9rem;
+  margin: 0 .2rem;
+  padding: .85rem;
+  border: 1px solid var(--sidebar-border);
+  border-radius: 10px;
+  color: var(--sidebar-muted);
+  font-size: .78rem;
+  line-height: 1.6;
+}
+
+.sidebar-empty i {
+  color: #a8b6ee;
+  font-size: 1rem;
+}
+
+.sidebar-empty p {
+  margin: .3rem 0 .45rem;
+}
+
+.sidebar-empty button {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: #c8d1ff;
+  cursor: pointer;
+}
+
+.sidebar-empty button:hover {
+  color: white;
 }
 
 .subscription-list {
-  margin-top: 0.8rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+  min-height: 0;
   overflow-y: auto;
-  padding-right: 0.25rem;
-  flex: 1 1 auto;
-}
-
-.subscription-item {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
-  border-radius: 8px;
-  padding: 0.6rem;
-  color: inherit;
-  text-decoration: none;
-  transition: background 0.15s ease;
-}
-
-.subscription-item:hover {
-  background: #f3f4f6;
-}
-
-.subscription-item.active {
-  background: #eff6ff;
-  outline: 1px solid #bfdbfe;
+  scrollbar-width: thin;
 }
 
 .subscription-avatar {
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
+  position: relative;
+  flex: 0 0 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 7px;
+  background: #303b66;
+  color: #d5deff;
+  font-size: .75rem;
+  font-weight: 700;
+}
+
+.subscription-avatar img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   object-fit: cover;
-  flex-shrink: 0;
-}
-
-.subscription-avatar.placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #e5e7eb;
-  color: #4b5563;
-  font-weight: 600;
-}
-
-.subscription-meta {
-  min-width: 0;
 }
 
 .subscription-name {
-  font-size: 0.92rem;
-  font-weight: 600;
-  color: #1f2937;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.subscription-id {
-  font-size: 0.78rem;
-  color: #6b7280;
-}
-
-@media (max-width: 1024px) {
-  .sidebar-panel {
-    height: auto;
-  }
-
-  .subscription-list {
-    overflow: visible;
-    padding-right: 0;
-  }
 }
 </style>

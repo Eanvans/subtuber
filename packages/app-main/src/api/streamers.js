@@ -143,3 +143,133 @@ export async function unsubscribe(streamerId) {
   if (!res.ok) throw new Error('Unsubscribe failed');
   return res.json();
 }
+
+async function requestJson(url, options = {}, defaultError = '请求失败') {
+  const res = await fetch(url, options);
+  if (!res.ok) {
+    let message = defaultError;
+    try {
+      const errorData = await res.json();
+      message = errorData.message || errorData.error || message;
+    } catch (e) {
+      // ignore JSON parse errors and keep the default fallback
+    }
+    throw new Error(message);
+  }
+  return res.headers.get('content-type')?.includes('application/json') ? res.json() : null;
+}
+
+export async function summarizeStreamer(streamerId, payload = {}) {
+  if (!streamerId) throw new Error('streamerId required');
+  return requestJson(`/api/streamers/${encodeURIComponent(streamerId)}/resummarize`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  }, '重新生成主播摘要失败');
+}
+
+export async function analyzeClipReport(payload = {}) {
+  return requestJson('/api/clip-reports/analyze', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  }, '提交分析失败');
+}
+
+export async function getClipReportStatus(reportId) {
+  if (!reportId) throw new Error('reportId required');
+  return requestJson(`/api/clip-reports/${encodeURIComponent(reportId)}/status`, {
+    method: 'GET'
+  }, '查询分析状态失败');
+}
+
+export async function getClipReportsMarketplace(params = {}) {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === '') return;
+    query.append(key, String(value));
+  });
+  const url = `/api/clip-reports/marketplace${query.toString() ? `?${query.toString()}` : ''}`;
+  return requestJson(url, { method: 'GET' }, '获取市场报告失败');
+}
+
+export async function getClipReportDetail(reportId) {
+  if (!reportId) throw new Error('reportId required');
+  return requestJson(`/api/clip-reports/${encodeURIComponent(reportId)}`, {
+    method: 'GET'
+  }, '获取报告详情失败');
+}
+
+export async function getClipReportUnlockQuote(reportId, payload = {}) {
+  if (!reportId) throw new Error('reportId required');
+  return requestJson(`/api/clip-reports/${encodeURIComponent(reportId)}/unlock-quote`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  }, '获取解锁报价失败');
+}
+
+export async function unlockClipReport(reportId, payload = {}) {
+  if (!reportId) throw new Error('reportId required');
+  return requestJson(`/api/clip-reports/${encodeURIComponent(reportId)}/unlock`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  }, '解锁报告失败');
+}
+
+export async function getUserPointsWallet() {
+  return requestJson('/api/user/points/wallet', { method: 'GET' }, '获取积分钱包失败');
+}
+
+export async function getUserPointsTransactions(params = {}) {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === '') return;
+    query.append(key, String(value));
+  });
+  const url = `/api/user/points/transactions${query.toString() ? `?${query.toString()}` : ''}`;
+  return requestJson(url, { method: 'GET' }, '获取积分流水失败');
+}
+
+export async function rechargePoints(payload = {}) {
+  return requestJson('/api/user/points/recharge', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  }, '充值失败');
+}
+
+export async function getUserNotifications(params = {}) {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === '') return;
+    query.append(key, String(value));
+  });
+  const url = `/api/user/notifications${query.toString() ? `?${query.toString()}` : ''}`;
+  return requestJson(url, { method: 'GET' }, '获取站内信失败');
+}
+
+export async function getBillingConfig() {
+  return requestJson('/api/admin/billing/config', { method: 'GET' }, '获取计费配置失败');
+}
+
+export async function updateBillingConfig(payload = {}) {
+  return requestJson('/api/admin/billing/config', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  }, '更新计费配置失败');
+}
+
+export async function getRechargePackages() {
+  return requestJson('/api/admin/recharge-packages', { method: 'GET' }, '获取充值档位失败');
+}
+
+export async function saveRechargePackage(payload = {}) {
+  return requestJson('/api/admin/recharge-packages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  }, '保存充值档位失败');
+}
