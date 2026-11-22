@@ -83,17 +83,10 @@ export async function getAnalysis(videoId, windowsLen, thr, searchRange, options
   return data || null;
 }
 
-export async function getAnalysisSummary(videoId, offsetSeconds, userHash) {
-  const params = new URLSearchParams();
-  if (videoId) params.append('video_id', videoId);
-  if (offsetSeconds !== undefined) params.append('offset_seconds', String(offsetSeconds));
-  if (userHash) params.append('user_hash', userHash);
-  
-  const url = `/api/twitch/analysis-summary?${params.toString()}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`/api/twitch/analysis-summary fetch failed`);
-  const data = await res.json();
-  return data && data.summary ? data.summary : null;
+export async function getRecordingClipReports(videoId, platform) {
+  if (!videoId) throw new Error('videoId required');
+  const query = new URLSearchParams({ platform });
+  return requestJson(`/api/recordings/${encodeURIComponent(videoId)}/clip-reports?${query}`, {}, '回放片段报告加载失败');
 }
 
 export async function subscribeStreamer(streamerData, { signal } = {}) {

@@ -7,10 +7,10 @@
         
         {
             "type": "node-terminal",
-            "name": "Run Script: dev (app-trackdownload)",
+            "name": "Run Script: dev (app-main)",
             "request": "launch",
             "command": "npm run dev",
-            "cwd": "${workspaceFolder}/packages/app-trackdownload"
+            "cwd": "${workspaceFolder}/packages/app-main"
         }
     ]
 }

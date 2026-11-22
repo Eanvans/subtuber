@@ -24,7 +24,7 @@
         <div class="analysis-header">
           <div>
             <h2 id="trend-title">直播热度趋势</h2>
-            <p>按回放时间查看互动得分，编号对应下方的高能片段。</p>
+            <p>互动得分按分钟汇总，编号对应已解锁的片段报告。</p>
           </div>
           <button type="button" class="btn btn-outline btn-sm" @click="showAdvanced = true">
             <i class="bi bi-sliders" aria-hidden="true"></i> 分析参数
@@ -42,42 +42,73 @@
           {{ seriesLoading ? '正在加载热度数据…' : seriesError || '暂无热度数据' }}
         </div>
       </section>
-
-      <section class="surface hot-moments" aria-labelledby="moments-title">
-        <div class="analysis-header">
-          <h2 id="moments-title">高能片段</h2>
-          <span class="moment-count">{{ hotMoments.length }} 个片段</span>
-        </div>
-        <div v-if="!hotMoments.length" class="analysis-state">暂无高能片段</div>
-        <ol v-else class="moments-list">
-          <li v-for="(moment, index) in hotMoments" :key="index" class="moment">
-            <div class="moment-meta">
-              <span class="moment-index">{{ moment.markerNo }}</span>
-              <div>
-                <div class="moment-time">{{ intervalRange(moment) }}</div>
-                <span class="moment-score">互动得分 <strong>{{ moment.comments_score ?? '—' }}</strong></span>
-              </div>
-            </div>
-            <div class="moment-summary">
-              <p v-if="moment.summaryLoading" role="status">正在加载摘要…</p>
-              <p v-else-if="moment.summaryError">{{ moment.summaryError }}</p>
-              <template v-else-if="moment.summary">
-                <p class="summary-text" :class="{ collapsed: moment.summary.length > 90 && !moment.expanded }" :id="`moment-summary-${index}`">{{ moment.summary }}</p>
-                <button
-                  v-if="moment.summary.length > 90"
-                  type="button"
-                  class="summary-toggle"
-                  :aria-expanded="moment.expanded"
-                  :aria-controls="`moment-summary-${index}`"
-                  @click="toggleExpand(moment)"
-                >{{ moment.expanded ? '收起摘要' : '展开摘要' }}</button>
-              </template>
-              <p v-else>暂无片段摘要</p>
-            </div>
-          </li>
-        </ol>
-      </section>
     </template>
+
+    <section class="surface hot-moments" aria-labelledby="moments-title" :aria-busy="reportsLoading">
+      <div class="analysis-header">
+        <h2 id="moments-title">高能片段</h2>
+        <span v-if="!reportsLoading && !reportsError" class="moment-count">{{ hotMoments.length }} 份报告</span>
+      </div>
+      <div v-if="reportsLoading" class="analysis-state" role="status">正在加载片段报告…</div>
+      <div v-else-if="reportsError" class="analysis-state" role="status">
+        <p>{{ reportsError }}</p>
+        <button type="button" class="btn btn-outline btn-sm" @click="fetchReports">重新加载</button>
+      </div>
+      <div v-else-if="!hotMoments.length" class="analysis-state">暂无片段报告</div>
+      <ol v-else class="moments-list">
+        <li v-for="moment in hotMoments" :key="moment.id" class="moment">
+          <div class="moment-meta">
+            <span class="moment-index">{{ moment.markerNo }}</span>
+            <div class="moment-timing">
+              <ul v-if="moment.windows.length" class="moment-windows">
+                <li v-for="(window, index) in moment.windows" :key="index" class="moment-time">
+                  {{ formatSeconds(window.start_seconds) }} – {{ formatSeconds(window.end_seconds) }}
+                </li>
+              </ul>
+              <span v-else-if="moment.locked" class="moment-locked"><i class="bi bi-lock" aria-hidden="true"></i> 起止时间待解锁</span>
+              <span v-else class="moment-locked">暂无起止时间</span>
+              <span v-if="moment.comments_score != null" class="moment-score">互动得分 <strong>{{ moment.comments_score }}</strong></span>
+              <button v-if="moment.locked" type="button" class="btn btn-outline btn-sm" @click="openUnlockDialog(moment)">
+                {{ moment.unlock_price_points > 0 ? `解锁时间 · ${moment.unlock_price_points} 积分` : '积分解锁时间' }}
+              </button>
+            </div>
+          </div>
+          <div class="moment-summary">
+            <template v-if="moment.summary">
+              <p class="summary-text" :class="{ collapsed: moment.summary.length > 90 && !moment.expanded }" :id="`moment-summary-${moment.id}`">{{ moment.summary }}</p>
+              <button
+                v-if="moment.summary.length > 90"
+                type="button"
+                class="summary-toggle"
+                :aria-expanded="moment.expanded"
+                :aria-controls="`moment-summary-${moment.id}`"
+                @click="toggleExpand(moment)"
+              >{{ moment.expanded ? '收起摘要' : '展开摘要' }}</button>
+            </template>
+            <p v-else>暂无片段摘要</p>
+          </div>
+        </li>
+      </ol>
+    </section>
+
+    <dialog ref="unlockDialog" class="workspace-dialog" aria-labelledby="recording-unlock-title" @click.self="closeUnlockDialog" @cancel="handleUnlockCancel">
+      <div v-if="activeReport" class="workspace-dialog-content">
+        <button type="button" class="workspace-dialog-close" aria-label="关闭解锁弹窗" :disabled="unlockBusy" @click="closeUnlockDialog">×</button>
+        <header class="workspace-dialog-header">
+          <h2 id="recording-unlock-title">解锁片段起止时间</h2>
+          <p v-if="unlockPrice !== null">确认后将扣除 {{ unlockPrice }} 积分，永久解锁该报告的片段起止时间。</p>
+          <p v-else-if="unlockBusy" role="status">正在获取解锁价格…</p>
+        </header>
+        <p v-if="unlockError" class="workspace-dialog-error" role="alert">{{ unlockError }}</p>
+        <footer class="workspace-dialog-actions">
+          <button type="button" class="btn btn-outline" autofocus :disabled="unlockBusy" @click="closeUnlockDialog">取消</button>
+          <button v-if="unlockPrice !== null" type="button" class="btn btn-primary" :disabled="unlockBusy" @click="confirmUnlock">
+            {{ unlockBusy ? '正在解锁…' : `确认支付 ${unlockPrice} 积分` }}
+          </button>
+          <button v-else type="button" class="btn btn-primary" :disabled="unlockBusy" @click="loadUnlockQuote">重新获取报价</button>
+        </footer>
+      </div>
+    </dialog>
 
     <transition name="slide-fade">
       <div v-if="showAdvanced" class="advanced-modal-overlay" @click.self="showAdvanced = false">
@@ -150,20 +181,23 @@
 </template>
 
 <script>
-import { ref, onMounted, onBeforeUnmount, nextTick, computed } from 'vue'
+import { ref, onMounted, onBeforeUnmount, nextTick, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { getAnalysis, getAnalysisSummary } from '../api/streamers'
+import { getAnalysis, getRecordingClipReports, getClipReportUnlockQuote, unlockClipReport } from '../api/streamers'
 import { useAuth } from '../composables/useAuth'
 import { formatPlatformName } from '../utils/platform'
+import { showNotification } from '../utils/notification'
 import Chart from 'chart.js/auto'
 
 export default {
   name: 'RecordingDetail',
-  setup() {
+  emits: ['request-login'],
+  setup(_, { emit }) {
     const TIME_SERIES_PAGE_SIZE = 1200
     const MAX_TIME_SERIES_PAGES = 200
     let chartInstance = null
-    let summaryLoadVersion = 0
+    let analysisRequest = 0
+    let reportsRequest = 0
     const route = useRoute()
     const { currentUser } = useAuth()
     const videoId = route.params.video_id
@@ -172,6 +206,13 @@ export default {
     const error = ref('')
     const analysis = ref({})
     const hotMoments = ref([])
+    const reportsLoading = ref(true)
+    const reportsError = ref('')
+    const unlockDialog = ref(null)
+    const activeReport = ref(null)
+    const unlockPrice = ref(null)
+    const unlockBusy = ref(false)
+    const unlockError = ref('')
     const timeSeriesData = ref([])
     const chartCanvas = ref(null)
     const seriesLoading = ref(false)
@@ -199,84 +240,123 @@ export default {
       return Number.isFinite(seconds) && seconds >= 0 ? seconds : null
     }
 
-    const buildHotMomentsWithState = (moments) => {
-      return [...(moments || [])]
-        .sort((a, b) => (getOffsetSeconds(a) ?? Infinity) - (getOffsetSeconds(b) ?? Infinity))
-        .map((moment, index) => ({
-          ...moment,
-          markerNo: index + 1,
-          summaryLoading: false,
-          summaryError: null,
-          summary: null,
-          expanded: false
-        }))
+    const fetchReports = async () => {
+      const request = ++reportsRequest
+      reportsLoading.value = true
+      reportsError.value = ''
+      try {
+        const data = await getRecordingClipReports(videoId, platformLabel.value.toLowerCase())
+        if (request !== reportsRequest) return
+        if (!Array.isArray(data?.items)) throw new Error('无效的片段报告响应')
+
+        hotMoments.value = data.items.map((report, index) => {
+          const unlocked = report.unlocked === true
+          const windows = unlocked && Array.isArray(report.highlights)
+            ? report.highlights.filter(({ start_seconds, end_seconds }) =>
+              Number.isFinite(start_seconds) && Number.isFinite(end_seconds) && start_seconds >= 0 && end_seconds > start_seconds)
+            : []
+          return {
+            id: report.id,
+            markerNo: index + 1,
+            locked: !unlocked && report.highlight_count > 0,
+            windows,
+            comments_score: report.comments_score,
+            unlock_price_points: report.unlock_price_points,
+            summary: unlocked ? report.summary || report.spoiler_free_summary : report.spoiler_free_summary,
+            expanded: false
+          }
+        })
+      } catch {
+        if (request === reportsRequest) reportsError.value = '片段报告加载失败，请重试。'
+      } finally {
+        if (request === reportsRequest) reportsLoading.value = false
+      }
+    }
+
+    const openUnlockDialog = async (report) => {
+      if (!currentUser.value) {
+        emit('request-login')
+        return
+      }
+      if (unlockDialog.value?.open) return
+      activeReport.value = report
+      unlockPrice.value = null
+      unlockError.value = ''
+      await nextTick()
+      if (activeReport.value !== report || !unlockDialog.value) return
+      unlockDialog.value.showModal()
+      await loadUnlockQuote()
+    }
+
+    const closeUnlockDialog = () => {
+      if (!unlockBusy.value) unlockDialog.value?.close()
+    }
+
+    const handleUnlockCancel = (event) => {
+      if (unlockBusy.value) event.preventDefault()
+    }
+
+    const loadUnlockQuote = async () => {
+      if (unlockBusy.value || !activeReport.value || !currentUser.value) return
+      const report = activeReport.value
+      unlockBusy.value = true
+      unlockError.value = ''
+      try {
+        const quote = await getClipReportUnlockQuote(report.id)
+        if (report !== activeReport.value) return
+        if (quote?.already_unlocked) {
+          unlockDialog.value?.close()
+          await fetchReports()
+          return
+        }
+        const price = quote?.unlock_price_points
+        if (!Number.isSafeInteger(price) || price <= 0) throw new Error('无法获取解锁价格，请重试。')
+        unlockPrice.value = price
+      } catch (error) {
+        if (report === activeReport.value) unlockError.value = error.message || '无法获取解锁价格，请重试。'
+      } finally {
+        unlockBusy.value = false
+      }
+    }
+
+    const confirmUnlock = async () => {
+      if (unlockBusy.value || unlockPrice.value === null || !activeReport.value || !currentUser.value) return
+      const report = activeReport.value
+      unlockBusy.value = true
+      unlockError.value = ''
+      try {
+        const result = await unlockClipReport(report.id, { confirm: true, expected_price_points: unlockPrice.value })
+        if (report !== activeReport.value) return
+        if (!result?.success) throw new Error('解锁失败，请重试。')
+        unlockDialog.value?.close()
+        showNotification('片段起止时间已解锁')
+        await fetchReports()
+      } catch (error) {
+        if (report !== activeReport.value) return
+        if (error.status === 409) unlockPrice.value = null
+        unlockError.value = error.message || '解锁失败，请重试。'
+      } finally {
+        unlockBusy.value = false
+      }
     }
 
     const getMomentMarkers = (series, moments) => {
-      const numberByOffset = new Map()
-      for (const moment of moments) {
-        const offset = getOffsetSeconds(moment)
-        if (offset !== null) numberByOffset.set(offset, moment.markerNo)
-      }
-
-      const markerByIndex = new Map()
-      series.forEach((point, index) => {
-        const offset = getOffsetSeconds(point)
-        if (numberByOffset.has(offset)) markerByIndex.set(index, numberByOffset.get(offset))
-      })
-      return markerByIndex
-    }
-
-    const loadMomentSummariesSequentially = async (moments, version) => {
-      const isYoutube = platform.value && platform.value.toLowerCase().includes('youtube')
-      const userHash = currentUser.value
-        ? (currentUser.value.userId || currentUser.value.user_id || currentUser.value.userHash || currentUser.value.user_hash || currentUser.value.hash || currentUser.value.id || null)
-        : null
+      const indexes = new Map(series.map((point, index) => [getOffsetSeconds(point), index]))
+      const markers = new Map()
 
       for (const moment of moments) {
-        if (version !== summaryLoadVersion) return
-
-        if (isYoutube) {
-          moment.summary = 'YouTube 回放的摘要暂不可用。'
-          continue
-        }
-
-        const offset = moment.offset_seconds ?? moment.offset ?? 0
-        moment.summaryLoading = true
-        try {
-          const summary = await getAnalysisSummary(videoId, offset, userHash)
-          if (version !== summaryLoadVersion) return
-          moment.summary = summary
-        } catch (err) {
-          if (version !== summaryLoadVersion) return
-          console.error(`加载摘要失败 (offset: ${offset})`, err)
-          moment.summaryError = '片段摘要加载失败'
-        } finally {
-          if (version === summaryLoadVersion) {
-            moment.summaryLoading = false
-          }
+        for (const window of moment.windows) {
+          // The chart uses minute buckets. The report itself retains exact start/end times.
+          const minute = Math.floor((window.start_seconds + window.end_seconds) / 120) * 60
+          const index = indexes.get(minute)
+          if (index === undefined) continue
+          const numbers = markers.get(index) ?? new Set()
+          numbers.add(moment.markerNo)
+          markers.set(index, numbers)
         }
       }
-    }
 
-    const formatOffset = (sec) => {
-      if (sec == null || isNaN(sec)) return ''
-      const m = Math.floor(sec / 60)
-      const s = Math.floor(sec % 60)
-      return `${m}:${String(s).padStart(2, '0')}`
-    }
-
-    const parseIntervalSeconds = (ti) => {
-      if (!ti) return 0
-      const str = String(ti).trim().toLowerCase()
-      // match patterns like "7min", "7 min", "30s"
-      const m = str.match(/(\d+)\s*(min|m|minute|minutes|s|sec|secs|second|seconds)?/i)
-      if (!m) return 0
-      const val = parseInt(m[1], 10) || 0
-      const unit = (m[2] || '').toLowerCase()
-      if (!unit || unit.startsWith('m')) return val * 60
-      if (unit.startsWith('s')) return val
-      return val * 60
+      return new Map(Array.from(markers, ([index, numbers]) => [index, [...numbers].join('、')]))
     }
 
     const formatSeconds = (sec) => {
@@ -289,30 +369,21 @@ export default {
       return `${m}:${String(ss).padStart(2, '0')}`
     }
 
-    const intervalRange = (m) => {
-      const off = (m && (m.offset_seconds ?? m.offset)) ? (m.offset_seconds ?? m.offset) : 0
-      const ti = (m && m.time_interval) ? m.time_interval : ''
-      const len = parseIntervalSeconds(ti)
-      if (!len) return (m && (m.formatted_time || formatOffset(off))) || ''
-      const half = Math.floor(len / 2)
-      const start = Math.max(0, off - half)
-      const end = off + (len - half)
-      return `${formatSeconds(start)} - ${formatSeconds(end)}`
-    }
-
     const toggleExpand = (moment) => {
       moment.expanded = !moment.expanded
     }
 
     const renderTimeSeriesChart = () => {
       const canvas = chartCanvas.value
-      if (!canvas || timeSeriesData.value.length === 0) return
+      if (chartInstance) {
+        chartInstance.destroy()
+        chartInstance = null
+      }
+      if (!canvas || !timeSeriesData.value.length) return
 
       const series = timeSeriesData.value
-      const labels = series.map((p) => p.formatted_time || formatOffset(getOffsetSeconds(p)))
+      const labels = series.map((p) => p.formatted_time || formatSeconds(getOffsetSeconds(p)))
       const values = series.map((p) => p.score ?? 0)
-      // Adjacent samples on a flat peak can all be flagged by the API.
-      // Number the merged moments at their timestamps, including on a curve drawn with custom parameters.
       const markerByIndex = getMomentMarkers(series, hotMoments.value)
       const momentColor = '#bd501b'
       const pointBg = series.map((_, index) => markerByIndex.has(index) ? momentColor : '#a4a7e6')
@@ -320,10 +391,6 @@ export default {
         if (markerByIndex.has(index)) return 4
         return point.is_peak ? 2 : 0
       })
-
-      if (chartInstance) {
-        chartInstance.destroy()
-      }
 
       const ctx = canvas.getContext('2d')
       const peakMarkerNumberPlugin = {
@@ -423,7 +490,7 @@ export default {
         let offset = 0
 
         for (let page = 0; page < MAX_TIME_SERIES_PAGES; page += 1) {
-          if (version !== summaryLoadVersion) return
+          if (version !== analysisRequest) return
           const pageData = await getAnalysis(
             videoId,
             windowsLen,
@@ -435,7 +502,7 @@ export default {
               timeSeriesLimit: TIME_SERIES_PAGE_SIZE
             }
           )
-          if (version !== summaryLoadVersion) return
+          if (version !== analysisRequest) return
           const chunk = Array.isArray(pageData?.time_series_data) ? pageData.time_series_data : []
           if (!chunk.length) break
 
@@ -444,25 +511,21 @@ export default {
           offset += chunk.length
         }
 
-        if (version !== summaryLoadVersion) return
+        if (version !== analysisRequest) return
         timeSeriesData.value = mergedSeries
-        if (timeSeriesData.value.length > 0) {
-          await nextTick()
-          if (version === summaryLoadVersion) renderTimeSeriesChart()
-        }
       } catch (seriesErr) {
-        if (version !== summaryLoadVersion) return
+        if (version !== analysisRequest) return
         timeSeriesData.value = []
         console.error('获取热度数据失败', seriesErr)
         seriesError.value = '热度数据加载失败，可重新应用分析参数。'
       } finally {
-        if (version === summaryLoadVersion) seriesLoading.value = false
+        if (version === analysisRequest) seriesLoading.value = false
       }
     }
 
     const fetchAnalysisData = async () => {
       try {
-        const version = ++summaryLoadVersion
+        const version = ++analysisRequest
         const windowsLen = analysisParams.value.windows_len
         const thr = analysisParams.value.thr
         const searchRange = analysisParams.value.search_range
@@ -474,22 +537,13 @@ export default {
           searchRange,
           { includeTimeSeries: false }
         )
-        if (version !== summaryLoadVersion) return
+        if (version !== analysisRequest) return
 
         analysis.value = data || {}
-        hotMoments.value = buildHotMomentsWithState((data && data.hot_moments) ? data.hot_moments : [])
         timeSeriesData.value = []
         seriesError.value = ''
         seriesLoading.value = true
         loading.value = false
-        if (chartInstance) {
-          chartInstance.destroy()
-          chartInstance = null
-        }
-
-        if (hotMoments.value.length > 0) {
-          void loadMomentSummariesSequentially(hotMoments.value, version)
-        }
         void loadTimeSeriesPaged(version, windowsLen, thr, searchRange)
       } catch (e) {
         console.error('RecordingDetail getAnalysis error', e)
@@ -519,13 +573,24 @@ export default {
       }
     }
 
+    watch([timeSeriesData, hotMoments, chartCanvas], renderTimeSeriesChart, { flush: 'post' })
+    watch(currentUser, () => {
+      hotMoments.value = []
+      unlockDialog.value?.close()
+      activeReport.value = null
+      void fetchReports()
+    })
+
     onMounted(async () => {
+      void fetchReports()
       await fetchAnalysisData()
       loading.value = false
     })
 
     onBeforeUnmount(() => {
-      summaryLoadVersion += 1
+      analysisRequest += 1
+      reportsRequest += 1
+      activeReport.value = null
       if (chartInstance) {
         chartInstance.destroy()
         chartInstance = null
@@ -547,7 +612,20 @@ export default {
       chartCanvas,
       seriesLoading,
       seriesError,
-      intervalRange,
+      reportsLoading,
+      reportsError,
+      fetchReports,
+      unlockDialog,
+      activeReport,
+      unlockPrice,
+      unlockBusy,
+      unlockError,
+      openUnlockDialog,
+      closeUnlockDialog,
+      handleUnlockCancel,
+      loadUnlockQuote,
+      confirmUnlock,
+      formatSeconds,
       toggleExpand,
       refreshAnalysis,
       applyAdvancedParams
@@ -581,6 +659,7 @@ export default {
 .legend-local-peak { width: 6px; height: 6px; border-radius: 50%; background: #a4a7e6; }
 .chart-container { position: relative; height: clamp(225px, 26vw, 340px); }
 .chart-state { min-height: 180px; display: grid; place-items: center; color: var(--muted-2); font-size: .85rem; }
+.hot-moments { margin-top: 1.2rem; }
 .hot-moments .analysis-header { padding: 1rem 1.25rem; }
 .moment-count { color: var(--muted-2); font-size: .8rem; white-space: nowrap; }
 .moments-list { margin: 0; padding: 0; list-style: none; }
@@ -605,7 +684,11 @@ export default {
   font-size: .72rem;
   font-weight: 750;
 }
-.moment-score { color: var(--muted-2); font-size: .76rem; font-variant-numeric: tabular-nums; }
+.moment-windows { display: grid; gap: .35rem; margin: 0; padding: 0; list-style: none; }
+.moment-timing { display: grid; justify-items: start; gap: .35rem; }
+.moment-score { color: var(--muted-2); font-size: .8rem; font-variant-numeric: tabular-nums; }
+.moment-locked { color: var(--muted-2); font-size: .8rem; }
+.moment-timing .btn { text-align: left; }
 .moment-summary { min-width: 0; }
 .moment-summary p { margin: 0; color: var(--muted); font-size: .85rem; line-height: 1.65; overflow-wrap: anywhere; }
 .summary-text { white-space: pre-wrap; }

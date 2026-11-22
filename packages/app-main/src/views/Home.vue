@@ -2,41 +2,16 @@
   <main class="workspace-width workspace-page">
     <header class="page-header">
       <div>
-        <h1>内容分析工作台</h1>
+        <div class="home-title-row">
+          <h1>内容分析工作台</h1>
+          <small v-if="totalReports !== null" class="market-total">{{ formatCount(totalReports) }} 份市场报告</small>
+        </div>
         <p>浏览直播切片报告，追踪订阅主播的回放与互动热点。</p>
       </div>
       <button type="button" class="btn btn-primary" @click="$emit('request-subscribe')">
         <span class="add-symbol" aria-hidden="true">+</span> 添加订阅
       </button>
     </header>
-
-    <dl class="overview-grid" aria-label="数据概览">
-      <div class="surface overview-metric">
-        <div class="metric-content">
-          <dt>市场报告</dt>
-          <dd>{{ formatCount(totalReports) }}</dd>
-          <span>市场已发布的切片报告</span>
-        </div>
-        <span class="metric-icon violet"><i class="bi bi-file-earmark-text" aria-hidden="true"></i></span>
-      </div>
-      <div class="surface overview-metric">
-        <div class="metric-content">
-          <dt>本页高能片段</dt>
-          <dd>{{ formatCount(totalReports == null ? null : pageHighlights) }}</dd>
-          <span>当前页报告识别的片段</span>
-        </div>
-        <span class="metric-icon blue"><i class="bi bi-activity" aria-hidden="true"></i></span>
-      </div>
-      <div class="surface overview-metric">
-        <div class="metric-content">
-          <dt>我的订阅</dt>
-          <dd>{{ formatCount(subscriptionCount) }}</dd>
-          <button v-if="!currentUser" type="button" class="text-button" @click="$emit('request-login')">登录后查看 <span aria-hidden="true">→</span></button>
-          <span v-else>已订阅的主播</span>
-        </div>
-        <span class="metric-icon mint"><i class="bi bi-bookmark" aria-hidden="true"></i></span>
-      </div>
-    </dl>
 
     <section id="clip-market" class="surface market-section" aria-labelledby="market-title">
       <header class="market-header">
@@ -173,7 +148,6 @@ import { useAuth } from '../composables/useAuth'
 import { showNotification } from '../utils/notification'
 import { formatPlatformName } from '../utils/platform'
 
-defineProps({ subscriptionCount: { type: Number, default: null } })
 const emit = defineEmits(['request-login', 'request-subscribe'])
 const { currentUser } = useAuth()
 const pageSize = 6
@@ -195,7 +169,6 @@ let marketRequest = 0
 const numberFormat = new Intl.NumberFormat('zh-CN')
 
 const pageCount = computed(() => Math.max(1, Math.ceil(totalReports.value / pageSize)))
-const pageHighlights = computed(() => marketReports.value.reduce((count, report) => count + report.highlight_count, 0))
 const displayedUnlockPrice = computed(() => unlockPrice.value ?? selectedReport.value?.unlock_cost ?? null)
 const platforms = computed(() => [...new Set(marketReports.value.map(report => report.platform))].sort())
 const visibleReports = computed(() => {
@@ -424,48 +397,30 @@ onMounted(() => fetchMarketplace(1))
 
 <style scoped>
 .add-symbol { font-size: 1.2rem; line-height: .9; }
-.overview-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1rem;
-  margin: 0 0 1.45rem;
-}
-
-.overview-metric {
-  min-height: 129px;
+.home-title-row {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: .6rem;
-  padding: 1.04rem 1.15rem;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: .3rem .8rem;
 }
 
-.metric-content dt { color: var(--muted); font-size: .86rem; font-weight: 650; }
-.metric-content dd {
-  margin: .23rem 0 .03rem;
-  font-size: clamp(1.85rem, 3vw, 2.2rem);
-  font-weight: 710;
-  line-height: 1.18;
-  letter-spacing: -.05em;
+.market-total {
+  color: var(--muted-2);
+  font-size: .82rem;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
-.metric-content > span, .text-button { color: var(--muted-2); font-size: .75rem; }
-.text-button { border: 0; padding: 0; background: none; color: var(--accent); cursor: pointer; }
-.text-button:hover { text-decoration: underline; }
-
-.metric-icon, .state-icon {
+.state-icon {
   display: grid;
-  flex: 0 0 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   place-items: center;
   border-radius: 9px;
-  font-size: 1rem;
+  color: var(--accent);
+  background: var(--accent-soft);
+  font-size: 1.2rem;
 }
-
-.metric-icon.violet, .state-icon { color: var(--accent); background: var(--accent-soft); }
-.metric-icon.blue { color: #2555a5; background: #eaf1ff; }
-.metric-icon.mint { color: #087661; background: #e5f6ef; }
 
 .market-section { scroll-margin-top: calc(var(--topbar-height) + 18px); }
 .market-header {
@@ -533,7 +488,6 @@ onMounted(() => fetchMarketplace(1))
 }
 
 .market-controls + .market-state { border-top: 0; }
-.state-icon { width: 44px; height: 44px; font-size: 1.2rem; }
 .market-state h3 { margin: .2rem 0 0; font-size: 1rem; }
 .market-state p { margin: 0; color: var(--muted-2); font-size: .86rem; }
 
@@ -600,11 +554,7 @@ onMounted(() => fetchMarketplace(1))
 
 @media (max-width: 1150px) { .report-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 510px) {
-  .overview-grid { gap: .48rem; }
-  .overview-metric { padding: .65rem .55rem; min-height: 103px; }
-  .metric-icon, .market-count { display: none; }
-  .metric-content dt { font-size: .76rem; }
-  .metric-content > span, .text-button { font-size: .66rem; }
+  .market-count { display: none; }
   .report-grid { grid-template-columns: 1fr; }
   .market-header, .market-controls, .market-pagination, .report-grid { padding-inline: .85rem; }
 }

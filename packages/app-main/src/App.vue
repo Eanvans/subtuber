@@ -99,7 +99,6 @@
         <component
           :is="Component"
           v-if="route.path === '/'"
-          :subscription-count="currentUser && !subscriptionsError && !subscriptionsLoading ? subscriptions.length : null"
           @request-login="openLogin"
           @request-subscribe="openSubscribe"
         />
