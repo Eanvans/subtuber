@@ -17,6 +17,7 @@ const router = createRouter({
   routes: [
     { path: '/', component: Home },
     { path: '/settings', name: 'settings', component: Settings },
+    { path: '/recharge', name: 'recharge', component: () => import('./views/Recharge.vue') },
     { path: '/privacy', name: 'privacy', component: Privacy },
     { path: '/terms', name: 'terms', component: Terms },
     { path: '/streamer/:streamer_id', name: 'streamer-detail', component: () => import('./views/StreamerDetail.vue') },

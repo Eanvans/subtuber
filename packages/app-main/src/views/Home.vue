@@ -122,6 +122,7 @@
             查看原视频 <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i>
           </a>
           <div class="dialog-actions">
+            <RouterLink v-if="reportNeedsRecharge" :to="{ name: 'recharge' }" class="btn btn-outline btn-sm" @click="reportDialog.close()">去充值</RouterLink>
             <span v-if="reportBusy" class="dialog-status" role="status">处理中…</span>
             <span v-else-if="selectedReport.is_unlocked" class="unlocked-label"><i class="bi bi-check-circle" aria-hidden="true"></i> 已解锁</span>
             <template v-else-if="unlockPrice !== null">
@@ -145,11 +146,13 @@ import { getClipReportDetail, getClipReportUnlockQuote, getClipReportsMarketplac
 import ClipReportCard from '../components/ClipReportCard.vue'
 import ReportStreamer from '../components/ReportStreamer.vue'
 import { useAuth } from '../composables/useAuth'
+import { usePointsWallet } from '../composables/usePointsWallet'
 import { showNotification } from '../utils/notification'
 import { formatPlatformName } from '../utils/platform'
 
 const emit = defineEmits(['request-login', 'request-subscribe'])
 const { currentUser } = useAuth()
+const { refreshWallet } = usePointsWallet()
 const pageSize = 6
 const marketReports = ref([])
 const marketLoading = ref(true)
@@ -162,6 +165,7 @@ const reportDialog = ref(null)
 const selectedReport = ref(null)
 const reportBusy = ref(false)
 const reportMessage = ref('')
+const reportNeedsRecharge = ref(false)
 const unlockPrice = ref(null)
 const needsDetail = ref(false)
 const reportDetails = new Map()
@@ -285,6 +289,7 @@ async function openReport(report) {
   unlockPrice.value = null
   needsDetail.value = false
   reportMessage.value = ''
+  reportNeedsRecharge.value = false
   await nextTick()
   if (selectedReport.value?.id !== report.id || !reportDialog.value) return
   reportDialog.value.showModal()
@@ -358,18 +363,21 @@ async function requestUnlock() {
 function cancelUnlock() {
   unlockPrice.value = null
   reportMessage.value = ''
+  reportNeedsRecharge.value = false
 }
 
 async function confirmUnlock() {
   if (reportBusy.value || unlockPrice.value === null) return
   reportBusy.value = true
   reportMessage.value = ''
+  reportNeedsRecharge.value = false
   try {
     const result = await unlockClipReport(selectedReport.value.id, {
       confirm: true,
       expected_price_points: unlockPrice.value
     })
     if (!result?.success) throw new Error('解锁失败，请稍后重试。')
+    void refreshWallet()
     unlockPrice.value = null
     needsDetail.value = true
     const detail = await fetchSelectedDetail()
@@ -377,6 +385,7 @@ async function confirmUnlock() {
     needsDetail.value = false
     showNotification('报告已解锁')
   } catch (error) {
+    reportNeedsRecharge.value = error.code === 'INSUFFICIENT_POINTS'
     if (error.status === 409) {
       unlockPrice.value = null
       if (selectedReport.value) selectedReport.value = { ...selectedReport.value, unlock_cost: null }

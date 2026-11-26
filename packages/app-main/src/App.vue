@@ -86,12 +86,22 @@
             </nav>
           </div>
 
-          <RouterLink v-if="currentUser" to="/settings" class="account-button">
-            <span class="account-avatar" aria-hidden="true">{{ accountLabel.slice(0, 1).toUpperCase() }}</span>
-            <span class="account-name">{{ accountLabel }}</span>
-            <i class="bi bi-chevron-down" aria-hidden="true"></i>
-          </RouterLink>
-          <button v-else type="button" class="btn btn-primary btn-sm" @click="openLogin">登录</button>
+          <div class="topbar-account">
+            <div class="topbar-wallet">
+              <span v-if="currentUser" class="topbar-points" aria-live="polite" :title="walletError || undefined">
+                <i class="bi bi-coin" aria-hidden="true"></i>
+                <span v-if="wallet"><strong>{{ formatPoints(wallet.available_points) }}</strong> 积分</span>
+                <span v-else>{{ walletLoading ? '读取积分…' : '积分暂不可用' }}</span>
+              </span>
+              <RouterLink :to="{ name: 'recharge' }" class="btn btn-outline btn-sm" aria-label="获取积分">获取</RouterLink>
+            </div>
+            <RouterLink v-if="currentUser" to="/settings" class="account-button" :aria-label="accountLabel + '的账号设置'">
+              <span class="account-avatar" aria-hidden="true">{{ accountLabel.slice(0, 1).toUpperCase() }}</span>
+              <span class="account-name">{{ accountLabel }}</span>
+              <i class="bi bi-chevron-down" aria-hidden="true"></i>
+            </RouterLink>
+            <button v-else type="button" class="btn btn-primary btn-sm" @click="openLogin">登录</button>
+          </div>
         </div>
       </header>
 
@@ -157,10 +167,12 @@ import Login from '../../shared-auth/Login.vue'
 import AddStreamerModal from './components/AddStreamerModal.vue'
 import SubscriptionSidebar from './components/SubscriptionSidebar.vue'
 import { useAuth } from './composables/useAuth'
+import { formatPoints, usePointsWallet } from './composables/usePointsWallet'
 import { showNotification } from './utils/notification'
 
 const route = useRoute()
 const { currentUser, setUser } = useAuth()
+const { wallet, walletLoading, walletError, refreshWallet } = usePointsWallet()
 const currentYear = new Date().getFullYear()
 const navigationOpen = ref(false)
 const navigationToggle = ref(null)
@@ -178,6 +190,7 @@ let subscribeAfterLogin = false
 
 const pageLabels = {
   settings: '账号设置',
+  recharge: '获取积分',
   privacy: '隐私政策',
   terms: '服务条款',
   'streamer-detail': '直播回放',
@@ -261,6 +274,7 @@ function handleEscape(event) {
 watch(currentUser, () => {
   subscriptions.value = []
   void fetchSubscriptions()
+  void refreshWallet()
 }, { immediate: true })
 watch(() => route.fullPath, closeNavigation)
 

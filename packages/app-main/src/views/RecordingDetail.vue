@@ -101,6 +101,7 @@
         </header>
         <p v-if="unlockError" class="workspace-dialog-error" role="alert">{{ unlockError }}</p>
         <footer class="workspace-dialog-actions">
+          <RouterLink v-if="unlockNeedsRecharge" :to="{ name: 'recharge' }" class="btn btn-outline" @click="closeUnlockDialog">去充值</RouterLink>
           <button type="button" class="btn btn-outline" autofocus :disabled="unlockBusy" @click="closeUnlockDialog">取消</button>
           <button v-if="unlockPrice !== null" type="button" class="btn btn-primary" :disabled="unlockBusy" @click="confirmUnlock">
             {{ unlockBusy ? '正在解锁…' : `确认支付 ${unlockPrice} 积分` }}
@@ -185,6 +186,7 @@ import { ref, onMounted, onBeforeUnmount, nextTick, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { getAnalysis, getRecordingClipReports, getClipReportUnlockQuote, unlockClipReport } from '../api/streamers'
 import { useAuth } from '../composables/useAuth'
+import { usePointsWallet } from '../composables/usePointsWallet'
 import { formatPlatformName } from '../utils/platform'
 import { showNotification } from '../utils/notification'
 import Chart from 'chart.js/auto'
@@ -200,6 +202,7 @@ export default {
     let reportsRequest = 0
     const route = useRoute()
     const { currentUser } = useAuth()
+    const { refreshWallet } = usePointsWallet()
     const videoId = route.params.video_id
     const platform = ref(route.query.platform || '')
     const loading = ref(true)
@@ -213,6 +216,7 @@ export default {
     const unlockPrice = ref(null)
     const unlockBusy = ref(false)
     const unlockError = ref('')
+    const unlockNeedsRecharge = ref(false)
     const timeSeriesData = ref([])
     const chartCanvas = ref(null)
     const seriesLoading = ref(false)
@@ -282,6 +286,7 @@ export default {
       activeReport.value = report
       unlockPrice.value = null
       unlockError.value = ''
+      unlockNeedsRecharge.value = false
       await nextTick()
       if (activeReport.value !== report || !unlockDialog.value) return
       unlockDialog.value.showModal()
@@ -322,10 +327,13 @@ export default {
     const confirmUnlock = async () => {
       if (unlockBusy.value || unlockPrice.value === null || !activeReport.value || !currentUser.value) return
       const report = activeReport.value
+      const user = currentUser.value
       unlockBusy.value = true
       unlockError.value = ''
+      unlockNeedsRecharge.value = false
       try {
         const result = await unlockClipReport(report.id, { confirm: true, expected_price_points: unlockPrice.value })
+        if (result?.success && currentUser.value === user) void refreshWallet()
         if (report !== activeReport.value) return
         if (!result?.success) throw new Error('解锁失败，请重试。')
         unlockDialog.value?.close()
@@ -333,6 +341,7 @@ export default {
         await fetchReports()
       } catch (error) {
         if (report !== activeReport.value) return
+        unlockNeedsRecharge.value = error.code === 'INSUFFICIENT_POINTS'
         if (error.status === 409) unlockPrice.value = null
         unlockError.value = error.message || '解锁失败，请重试。'
       } finally {
@@ -620,6 +629,7 @@ export default {
       unlockPrice,
       unlockBusy,
       unlockError,
+      unlockNeedsRecharge,
       openUnlockDialog,
       closeUnlockDialog,
       handleUnlockCancel,

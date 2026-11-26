@@ -142,14 +142,17 @@ async function requestJson(url, options = {}, defaultError = '请求失败') {
   const res = await fetch(url, options);
   if (!res.ok) {
     let message = defaultError;
+    let code;
     try {
       const errorData = await res.json();
       message = errorData.message || errorData.error || message;
+      code = errorData.code;
     } catch (e) {
       // ignore JSON parse errors and keep the default fallback
     }
     const error = new Error(message);
     error.status = res.status;
+    error.code = code;
     throw error;
   }
   return res.headers.get('content-type')?.includes('application/json') ? res.json() : null;
@@ -215,7 +218,11 @@ export async function unlockClipReport(reportId, payload = {}) {
 }
 
 export async function getUserPointsWallet() {
-  return requestJson('/api/user/points/wallet', { method: 'GET' }, '获取积分钱包失败');
+  return requestJson('/api/user/points/wallet', { cache: 'no-store' }, '获取积分钱包失败');
+}
+
+export async function getPointRewardRules() {
+  return requestJson('/api/points/reward-rules', {}, '获取积分奖励规则失败');
 }
 
 export async function getUserPointsTransactions(params = {}) {

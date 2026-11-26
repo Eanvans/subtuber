@@ -326,9 +326,22 @@ a { color: var(--accent); }
 .breadcrumb-divider { color: #8894aa; font-weight: 400; }
 .navigation-toggle, .navigation-backdrop { display: none; }
 
+.topbar-account, .topbar-wallet, .topbar-points {
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+  min-width: 0;
+}
+
+.topbar-wallet { flex-shrink: 0; }
+.topbar-wallet .btn { white-space: nowrap; }
+.topbar-points { color: var(--muted-2); font-size: .78rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.topbar-points strong { color: var(--text); }
+.topbar-points i { color: var(--accent); }
+
 .account-button {
   min-width: 0;
-  max-width: min(42%, 240px);
+  max-width: 240px;
   display: flex;
   align-items: center;
   gap: .55rem;
@@ -555,9 +568,17 @@ a { color: var(--accent); }
   :root { --workspace-gutter: 16px; }
   .breadcrumb-parent, .breadcrumb > a:first-child, .breadcrumb > .breadcrumb-divider { display: none; }
   .topbar-location { gap: .6rem; }
+  .topbar-account, .topbar-wallet, .topbar-points { gap: .35rem; }
+  .account-button > i { display: none; }
   .page-header { align-items: flex-start; flex-direction: column; }
   .footer-inner { row-gap: .5rem; }
   .card { padding: 1.25rem; }
+}
+
+@media (max-width: 430px) {
+  .account-button { padding: .25rem; }
+  .account-name, .topbar-points i, .navigation-toggle > span { display: none; }
+  .breadcrumb [aria-current="page"] { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
 
 @media (prefers-reduced-motion: reduce) {
