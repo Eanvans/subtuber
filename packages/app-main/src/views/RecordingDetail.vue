@@ -46,7 +46,9 @@
 
     <section class="surface hot-moments" aria-labelledby="moments-title" :aria-busy="reportsLoading">
       <div class="analysis-header">
-        <h2 id="moments-title">高能片段</h2>
+        <div>
+          <h2 id="moments-title">高能片段</h2>
+        </div>
         <span v-if="!reportsLoading && !reportsError" class="moment-count">{{ hotMoments.length }} 份报告</span>
       </div>
       <div v-if="reportsLoading" class="analysis-state" role="status">正在加载片段报告…</div>
@@ -57,34 +59,21 @@
       <div v-else-if="!hotMoments.length" class="analysis-state">暂无片段报告</div>
       <ol v-else class="moments-list">
         <li v-for="moment in hotMoments" :key="moment.id" class="moment">
-          <div class="moment-meta">
-            <span class="moment-index">{{ moment.markerNo }}</span>
-            <div class="moment-timing">
-              <ul v-if="moment.windows.length" class="moment-windows">
-                <li v-for="(window, index) in moment.windows" :key="index" class="moment-time">
-                  {{ formatSeconds(window.start_seconds) }} – {{ formatSeconds(window.end_seconds) }}
-                </li>
-              </ul>
-              <span v-else-if="moment.locked" class="moment-locked"><i class="bi bi-lock" aria-hidden="true"></i> 起止时间待解锁</span>
-              <span v-else class="moment-locked">暂无起止时间</span>
-              <span v-if="moment.comments_score != null" class="moment-score">互动得分 <strong>{{ moment.comments_score }}</strong></span>
-              <button v-if="moment.locked" type="button" class="btn btn-outline btn-sm" @click="openUnlockDialog(moment)">
-                {{ moment.unlock_price_points > 0 ? `解锁时间 · ${moment.unlock_price_points} 积分` : '积分解锁时间' }}
-              </button>
-            </div>
+          <div class="moment-timing">
+            <ul v-if="moment.windows.length" class="moment-windows">
+              <li v-for="(window, index) in moment.windows" :key="index" class="moment-time">
+                {{ formatSeconds(window.start_seconds) }} – {{ formatSeconds(window.end_seconds) }}
+              </li>
+            </ul>
+            <span v-else-if="moment.locked" class="moment-locked"><i class="bi bi-lock" aria-hidden="true"></i> 起止时间和得分待解锁</span>
+            <span v-else class="moment-locked">暂无起止时间</span>
+            <span v-if="moment.comments_score != null" class="moment-score">{{ moment.highlight_count > 1 ? '最高互动得分' : '互动得分' }} <strong>{{ moment.comments_score }}</strong></span>
+            <button v-if="moment.locked" type="button" class="btn btn-outline btn-sm" @click="openUnlockDialog(moment)">
+              {{ moment.unlock_price_points > 0 ? `解锁片段 · ${moment.unlock_price_points} 积分` : '积分解锁片段' }}
+            </button>
           </div>
           <div class="moment-summary">
-            <template v-if="moment.summary">
-              <p class="summary-text" :class="{ collapsed: moment.summary.length > 90 && !moment.expanded }" :id="`moment-summary-${moment.id}`">{{ moment.summary }}</p>
-              <button
-                v-if="moment.summary.length > 90"
-                type="button"
-                class="summary-toggle"
-                :aria-expanded="moment.expanded"
-                :aria-controls="`moment-summary-${moment.id}`"
-                @click="toggleExpand(moment)"
-              >{{ moment.expanded ? '收起摘要' : '展开摘要' }}</button>
-            </template>
+            <p v-if="moment.summary" class="summary-text">{{ moment.summary }}</p>
             <p v-else>暂无片段摘要</p>
           </div>
         </li>
@@ -95,8 +84,8 @@
       <div v-if="activeReport" class="workspace-dialog-content">
         <button type="button" class="workspace-dialog-close" aria-label="关闭解锁弹窗" :disabled="unlockBusy" @click="closeUnlockDialog">×</button>
         <header class="workspace-dialog-header">
-          <h2 id="recording-unlock-title">解锁片段起止时间</h2>
-          <p v-if="unlockPrice !== null">确认后将扣除 {{ unlockPrice }} 积分，永久解锁该报告的片段起止时间。</p>
+          <h2 id="recording-unlock-title">解锁片段</h2>
+          <p v-if="unlockPrice !== null">确认后将扣除 {{ unlockPrice }} 积分，永久解锁片段起止时间和互动得分。</p>
           <p v-else-if="unlockBusy" role="status">正在获取解锁价格…</p>
         </header>
         <p v-if="unlockError" class="workspace-dialog-error" role="alert">{{ unlockError }}</p>
@@ -263,11 +252,11 @@ export default {
             id: report.id,
             markerNo: index + 1,
             locked: !unlocked && report.highlight_count > 0,
+            highlight_count: report.highlight_count,
             windows,
-            comments_score: report.comments_score,
+            comments_score: unlocked ? report.comments_score : null,
             unlock_price_points: report.unlock_price_points,
-            summary: unlocked ? report.summary || report.spoiler_free_summary : report.spoiler_free_summary,
-            expanded: false
+            summary: unlocked ? report.summary || report.spoiler_free_summary : report.spoiler_free_summary
           }
         })
       } catch {
@@ -337,7 +326,7 @@ export default {
         if (report !== activeReport.value) return
         if (!result?.success) throw new Error('解锁失败，请重试。')
         unlockDialog.value?.close()
-        showNotification('片段起止时间已解锁')
+        showNotification('片段起止时间和得分已解锁')
         await fetchReports()
       } catch (error) {
         if (report !== activeReport.value) return
@@ -376,10 +365,6 @@ export default {
       const ss = s % 60
       if (h > 0) return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(ss).padStart(2, '0')}`
       return `${m}:${String(ss).padStart(2, '0')}`
-    }
-
-    const toggleExpand = (moment) => {
-      moment.expanded = !moment.expanded
     }
 
     const renderTimeSeriesChart = () => {
@@ -636,7 +621,6 @@ export default {
       loadUnlockQuote,
       confirmUnlock,
       formatSeconds,
-      toggleExpand,
       refreshAnalysis,
       applyAdvancedParams
     }
@@ -672,43 +656,34 @@ export default {
 .hot-moments { margin-top: 1.2rem; }
 .hot-moments .analysis-header { padding: 1rem 1.25rem; }
 .moment-count { color: var(--muted-2); font-size: .8rem; white-space: nowrap; }
-.moments-list { margin: 0; padding: 0; list-style: none; }
+.moments-list {
+  columns: 21rem 2;
+  column-gap: .9rem;
+  margin: 0;
+  padding: 0 1.25rem .4rem;
+  list-style: none;
+}
 .moment {
   display: grid;
-  grid-template-columns: minmax(150px, .7fr) minmax(0, 2.2fr);
-  gap: .75rem 1.2rem;
-  padding: .95rem 1.25rem;
-  border-top: 1px solid var(--border);
+  gap: .75rem;
+  break-inside: avoid;
+  margin-bottom: .9rem;
+  padding: .95rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 9px;
 }
-.moment-meta { display: flex; align-items: flex-start; gap: .55rem; }
 .moment-time { color: var(--text); font-size: .88rem; font-variant-numeric: tabular-nums; font-weight: 700; }
-.moment-index {
-  display: grid;
-  place-items: center;
-  min-width: 23px;
-  height: 23px;
-  padding: 0 .2rem;
-  border-radius: 6px;
-  color: #97421b;
-  background: #fff0e6;
-  font-size: .72rem;
-  font-weight: 750;
-}
 .moment-windows { display: grid; gap: .35rem; margin: 0; padding: 0; list-style: none; }
-.moment-timing { display: grid; justify-items: start; gap: .35rem; }
+.moment-timing { display: grid; align-self: start; justify-items: start; gap: .35rem; }
 .moment-score { color: var(--muted-2); font-size: .8rem; font-variant-numeric: tabular-nums; }
 .moment-locked { color: var(--muted-2); font-size: .8rem; }
 .moment-timing .btn { text-align: left; }
 .moment-summary { min-width: 0; }
 .moment-summary p { margin: 0; color: var(--muted); font-size: .85rem; line-height: 1.65; overflow-wrap: anywhere; }
 .summary-text { white-space: pre-wrap; }
-.summary-text.collapsed { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
-.summary-toggle { background: none; color: var(--accent); border: 0; padding: 0; margin-top: .25rem; font-size: .78rem; cursor: pointer; }
-.summary-toggle:hover { text-decoration: underline; }
 
 @media (max-width: 560px) {
-  .moment { grid-template-columns: 1fr; }
-  .time-series-chart, .hot-moments .analysis-header, .moment { padding-inline: .85rem; }
+  .time-series-chart, .hot-moments .analysis-header, .moments-list { padding-inline: .85rem; }
   .time-series-chart .analysis-header { align-items: flex-start; }
 }
 
