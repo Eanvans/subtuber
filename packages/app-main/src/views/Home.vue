@@ -184,6 +184,7 @@ function normalizeReport(report, fallback = {}) {
     source_video_id: isUnlocked ? report.source_video_id || report.video_id : undefined,
     source_link: isUnlocked ? sourceLink(report.source_url) : '',
     title: `切片报告 #${id}`,
+    streamer_id: report.streamer_id || fallback.streamer_id || report.streamer_name || '',
     streamer_name: report.streamer_name || fallback.streamer_name || '',
     streamer_avatar_url: sourceLink(report.streamer_avatar_url) || fallback.streamer_avatar_url || '',
     platform: formatPlatformName(report.source_platform || report.platform || fallback.platform),

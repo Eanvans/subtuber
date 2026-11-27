@@ -116,7 +116,10 @@
           :is="Component"
           v-else
           :key="route.name === 'recording' ? route.fullPath : route.name"
+          v-bind="route.name === 'streamer-detail' ? { subscribed: activeStreamerSubscribed, subscriptionsLoading, subscriptionsError } : {}"
           @request-login="openLogin"
+          @subscribed="handleSubscriptionAdded"
+          @retry-subscriptions="fetchSubscriptions"
         />
       </RouterView>
 
@@ -199,6 +202,9 @@ const pageLabels = {
 const pageLabel = computed(() => pageLabels[route.name] || (route.hash === '#clip-market' ? '切片市场' : '数据概览'))
 const accountLabel = computed(() => currentUser.value?.displayName || currentUser.value?.email || '我的账号')
 const activeSubscriptionId = computed(() => String(route.params.streamer_id || route.query.streamer_id || ''))
+const activeStreamerSubscribed = computed(() => subscriptions.value.some(
+  streamer => String(streamer.id).toLowerCase() === activeSubscriptionId.value.toLowerCase()
+))
 
 function closeNavigation() {
   if (!navigationOpen.value) return
@@ -233,7 +239,7 @@ async function fetchSubscriptions() {
   if (!user) return
 
   try {
-    const response = await fetch('/api/user/subscriptions')
+    const response = await fetch('/api/user/subscriptions', { cache: 'no-store' })
     if (!response.ok) throw new Error('获取订阅列表失败')
     const data = await response.json()
     if (request === subscriptionsRequest) subscriptions.value = data?.streamers || []

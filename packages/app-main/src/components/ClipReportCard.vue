@@ -1,7 +1,7 @@
 <template>
   <article class="report-card">
     <div class="report-heading">
-      <ReportStreamer :name="report.streamer_name" :avatar-url="report.streamer_avatar_url" />
+      <ReportStreamer :name="report.streamer_name" :avatar-url="report.streamer_avatar_url" :streamer-id="report.streamer_id" />
       <div class="report-metadata">
         <span class="platform-label" :data-platform="report.platform">
           <i v-if="report.platform === 'Twitch'" class="bi bi-twitch" aria-hidden="true"></i>

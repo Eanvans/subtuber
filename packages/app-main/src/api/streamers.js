@@ -26,6 +26,7 @@ export async function getStreamerVODs(streamerId, options = {}) {
 
   return {
     vods,
+    streamer: data?.streamer ?? null,
     hasMore: typeof data?.has_more === 'boolean' ? data.has_more : null,
     nextOffset: typeof data?.next_offset === 'number' ? data.next_offset : null,
     total: typeof data?.total === 'number' ? data.total : null
@@ -90,21 +91,14 @@ export async function getRecordingClipReports(videoId, platform) {
 }
 
 export async function subscribeStreamer(streamerData, { signal } = {}) {
-  const res = await fetch('/api/streamers/subscribe', {
+  return requestJson('/api/streamers/subscribe', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify(streamerData),
     signal
-  });
-  
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.message || '订阅主播失败');
-  }
-  
-  return await res.json();
+  }, '订阅主播失败');
 }
 
 // 订阅管理相关 API
@@ -118,13 +112,11 @@ export async function checkSubscription(streamerId) {
 
 export async function subscribe(streamerId) {
   if (!streamerId) throw new Error('streamerId required');
-  const res = await fetch('/api/user/subscriptions', {
+  return requestJson('/api/user/subscriptions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ streamer_id: streamerId })
-  });
-  if (!res.ok) throw new Error('Subscribe failed');
-  return res.json();
+  }, '订阅主播失败');
 }
 
 export async function unsubscribe(streamerId) {
