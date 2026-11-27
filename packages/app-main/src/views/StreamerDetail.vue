@@ -32,23 +32,21 @@
           <h2 id="vod-heading">直播回放</h2>
           <p>选择一场直播，查看热度走势和高能片段。</p>
         </div>
-        <span v-if="vods.length" class="vod-count">已加载 {{ vods.length }} 场</span>
+        <span v-if="total !== null" class="vod-count">共 {{ total }} 场</span>
       </header>
       <div v-if="loading" class="vod-state" role="status">正在加载直播回放…</div>
-      <div v-else-if="error && !vods.length" class="vod-state" role="status">
+      <div v-else-if="error" class="vod-state" role="status">
         <p>{{ error }}</p>
-        <button type="button" class="btn btn-outline btn-sm" @click="fetchVods(true)">重新加载</button>
+        <button type="button" class="btn btn-outline btn-sm" @click="fetchVods">重新加载</button>
       </div>
       <div v-else-if="!vods.length" class="vod-state">暂无直播回放记录</div>
       <template v-else>
         <VODList :vods="vods" :streamer-id="streamerId" />
-        <footer class="history-actions">
-          <p v-if="error" role="status">{{ error }}</p>
-          <button v-if="hasMore" type="button" class="btn btn-outline btn-sm" :disabled="loadingMore" @click="fetchVods(false)">
-            {{ loadingMore ? '正在加载…' : '加载更多回放' }}
-          </button>
-          <span v-else>已加载全部历史回放</span>
-        </footer>
+        <nav v-if="page > 1 || hasMore" class="history-actions" aria-label="直播回放分页">
+          <button type="button" class="btn btn-outline btn-sm" :disabled="page <= 1" @click="goToPage(page - 1)">上一页</button>
+          <span aria-current="page">第 {{ page }}<template v-if="pageCount !== null"> / {{ pageCount }}</template> 页</span>
+          <button type="button" class="btn btn-outline btn-sm" :disabled="!hasMore" @click="goToPage(page + 1)">下一页</button>
+        </nav>
       </template>
     </section>
   </main>
@@ -56,7 +54,7 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { getStreamerVODs, subscribe, subscribeStreamer } from '../api/streamers'
 import VODList from '../components/VODList.vue'
 import { useAuth } from '../composables/useAuth'
@@ -69,23 +67,30 @@ const props = defineProps({
 const emit = defineEmits(['request-login', 'subscribed', 'retry-subscriptions'])
 const pageSize = 20
 const route = useRoute()
+const router = useRouter()
 const { currentUser } = useAuth()
 const streamerId = computed(() => String(route.params.streamer_id || ''))
+const page = computed(() => {
+  const value = route.query.page
+  const number = typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : 1
+  return number > 0 && Number.isSafeInteger(number * pageSize) ? number : 1
+})
 const streamerProfile = ref(null)
 const streamerInfo = ref(null)
 const streamerName = computed(() => streamerProfile.value?.name || streamerInfo.value?.streamer_name || streamerInfo.value?.name || streamerId.value || '主播')
 const avatarUrl = computed(() => streamerProfile.value?.profile_image_url || streamerInfo.value?.avatar_url || '')
 const vods = ref([])
 const loading = ref(true)
-const loadingMore = ref(false)
-const hasMore = ref(true)
+const total = ref(null)
+const pageCount = computed(() => total.value === null ? null : Math.max(1, Math.ceil(total.value / pageSize)))
+const hasMore = ref(false)
 const error = ref('')
 const subscribing = ref(false)
 const subscribedHere = ref(false)
 const subscribeError = ref('')
 const isSubscribed = computed(() => Boolean(currentUser.value) && (props.subscribed || subscribedHere.value))
-const vodPlatform = computed(() => vods.value
-  .map(vod => String(vod.platform || '').toLowerCase())
+const vodPlatform = computed(() => [streamerInfo.value, ...vods.value]
+  .map(vod => String(vod?.platform || '').toLowerCase())
   .find(platform => platform === 'twitch' || platform === 'youtube'))
 const canSubscribe = computed(() => Boolean(streamerProfile.value?.id || vodPlatform.value))
 const subscriptionDisabled = computed(() => Boolean(currentUser.value && (
@@ -100,50 +105,49 @@ const subscriptionLabel = computed(() => {
   if (props.subscriptionsError) return '重试订阅状态'
   return canSubscribe.value ? '订阅主播' : '暂无订阅信息'
 })
-let offset = 0
 let requestVersion = 0
 let subscriptionRequest = 0
 
-async function fetchVods(reset) {
-  if (!streamerId.value || (!reset && (!hasMore.value || loadingMore.value))) return
-
-  const version = ++requestVersion
-  error.value = ''
-  if (reset) {
-    loading.value = true
-    loadingMore.value = false
-    vods.value = []
-    hasMore.value = true
-    offset = 0
-  } else {
-    loadingMore.value = true
+function pageLocation(number) {
+  return {
+    name: 'streamer-detail',
+    params: { streamer_id: streamerId.value },
+    query: { ...route.query, page: number > 1 ? String(number) : undefined }
   }
+}
+
+function goToPage(number) {
+  void router.push(pageLocation(number))
+}
+
+async function fetchVods() {
+  if (!streamerId.value) return
+  const version = ++requestVersion
+  const requestedPage = page.value
+  const offset = (requestedPage - 1) * pageSize
+  error.value = ''
+  loading.value = true
+  vods.value = []
 
   try {
     const result = await getStreamerVODs(streamerId.value, { limit: pageSize, offset })
     if (requestVersion !== version) return
-    if (reset) streamerProfile.value = result.streamer
+    streamerProfile.value = result.streamer
+    total.value = result.total
+    if (pageCount.value !== null && requestedPage > pageCount.value) {
+      await router.replace(pageLocation(pageCount.value))
+      return
+    }
 
-    const knownIds = new Set(vods.value.map(vod => vod.video_id))
-    const entries = result.vods.filter(vod => {
-      if (!vod.video_id || knownIds.has(vod.video_id)) return false
-      knownIds.add(vod.video_id)
-      return true
-    })
     if (!streamerInfo.value && result.vods.length) streamerInfo.value = result.vods[0]
-    vods.value.push(...entries)
-    const nextOffset = result.nextOffset ?? offset + result.vods.length
-    hasMore.value = Boolean(entries.length && nextOffset > offset && (result.hasMore ?? result.vods.length >= pageSize))
-    offset = nextOffset
+    vods.value = result.vods
+    hasMore.value = result.hasMore ?? result.vods.length >= pageSize
   } catch (cause) {
     if (requestVersion !== version) return
     console.error('获取直播回放失败', cause)
     error.value = '直播回放加载失败，请重试。'
   } finally {
-    if (requestVersion === version) {
-      loading.value = false
-      loadingMore.value = false
-    }
+    if (requestVersion === version) loading.value = false
   }
 }
 
@@ -185,10 +189,13 @@ watch([streamerId, currentUser], () => {
   subscribeError.value = ''
 }, { flush: 'sync' })
 
-watch(streamerId, () => {
-  streamerProfile.value = null
-  streamerInfo.value = null
-  void fetchVods(true)
+watch([streamerId, page], ([id], [previousId] = []) => {
+  if (id !== previousId) {
+    streamerProfile.value = null
+    streamerInfo.value = null
+    total.value = null
+  }
+  void fetchVods()
 }, { immediate: true })
 </script>
 
@@ -218,8 +225,7 @@ watch(streamerId, () => {
 .vod-count { flex-shrink: 0; color: var(--muted-2); font-size: .78rem; }
 .vod-state { padding: 3.25rem 1rem; border-top: 1px solid var(--border); text-align: center; color: var(--muted-2); font-size: .86rem; }
 .vod-state p { margin: 0 0 .65rem; }
-.history-actions { padding: .9rem 1rem; text-align: center; color: var(--muted-2); font-size: .8rem; }
-.history-actions p { margin: 0 0 .6rem; }
+.history-actions { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: .75rem; padding: .9rem 1rem; color: var(--muted-2); font-size: .8rem; }
 
 @media (max-width: 510px) {
   .streamer-subscription { justify-items: start; }

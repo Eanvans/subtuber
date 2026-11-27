@@ -6,7 +6,7 @@
     <RouterLink
       v-for="vod in vods"
       :key="vod.video_id"
-      :to="{ name: 'recording', params: { video_id: vod.video_id }, query: { platform: vod.platform || 'twitch', streamer_id: streamerId } }"
+      :to="{ name: 'recording', params: { video_id: vod.video_id }, query: { platform: vod.platform || 'twitch', streamer_id: streamerId }, state: { recordingTitle: vod.title || '' } }"
       class="vod-row vod-link"
     >
       <span class="vod-title">{{ vod.title || '未命名直播' }}</span>

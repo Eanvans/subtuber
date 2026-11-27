@@ -2,7 +2,7 @@
   <main class="workspace-width workspace-page">
     <header class="page-header">
       <div>
-        <h1>回放热度分析</h1>
+        <h1>{{ recordingTitle || '回放热度分析' }}</h1>
         <div class="recording-meta">
           <span v-if="analysis.streamer_name">{{ analysis.streamer_name }}</span>
           <span class="platform-label" :data-platform="platformLabel">{{ platformLabel }}</span>
@@ -156,7 +156,7 @@
 
 <script>
 import { ref, onMounted, onBeforeUnmount, nextTick, computed, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { getAnalysis, getRecordingClipReports, getClipReportUnlockQuote, unlockClipReport } from '../api/streamers'
 import { useAuth } from '../composables/useAuth'
 import { usePointsWallet } from '../composables/usePointsWallet'
@@ -176,6 +176,7 @@ export default {
     let analysisRequest = 0
     let reportsRequest = 0
     const route = useRoute()
+    const listTitle = String(useRouter().options.history.state.recordingTitle || '').trim()
     const { currentUser } = useAuth()
     const { refreshWallet } = usePointsWallet()
     const videoId = route.params.video_id
@@ -183,6 +184,7 @@ export default {
     const loading = ref(true)
     const error = ref('')
     const analysis = ref({})
+    const recordingTitle = computed(() => listTitle || analysis.value.video_info?.title?.trim())
     const hotMoments = ref([])
     const reportsLoading = ref(true)
     const reportsError = ref('')
@@ -590,6 +592,7 @@ export default {
       loading,
       error,
       analysis,
+      recordingTitle,
       hotMoments,
       timeSeriesData,
       analysisParams,
