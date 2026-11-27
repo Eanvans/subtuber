@@ -28,7 +28,20 @@
           <i class="bi bi-calendar-check reward-icon" aria-hidden="true"></i>
           <div>
             <h3>每日登录</h3>
-            <p>北京时间每天首次登录后自动到账。</p>
+            <p>北京时间每天首次登录或返回工作台时自动到账。</p>
+            <p v-if="currentUser && dailyRewardStatus === 'claimed'">今日奖励已到账</p>
+            <button
+              v-else-if="currentUser && dailyRewardStatus === 'verify'"
+              type="button"
+              class="btn btn-outline btn-sm reward-verify"
+              @click="$emit('request-login')"
+            >登录领取</button>
+            <button
+              v-else-if="currentUser && dailyRewardStatus === 'error'"
+              type="button"
+              class="btn btn-outline btn-sm reward-verify"
+              @click="checkDailyReward"
+            >重试领取</button>
           </div>
           <span v-if="rewards" class="reward-value">+{{ formatPoints(rewards.daily_login_points) }} 积分</span>
         </li>
@@ -90,7 +103,7 @@ import { formatPoints, usePointsWallet } from '../composables/usePointsWallet'
 defineEmits(['request-login'])
 
 const { currentUser } = useAuth()
-const { wallet, walletLoading, walletError, refreshWallet } = usePointsWallet()
+const { wallet, walletLoading, walletError, refreshWallet, dailyRewardStatus, checkDailyReward } = usePointsWallet()
 const rewards = ref(null)
 const rewardsError = ref(false)
 const presetAmounts = [5, 10, 15, 20]
@@ -160,6 +173,7 @@ onMounted(loadRewards)
 }
 .reward-option h3 { margin: 0; font-size: .9rem; }
 .reward-option p { margin: .25rem 0 0; color: var(--muted-2); font-size: .8rem; }
+.reward-verify { margin-top: .4rem; }
 .reward-value { color: var(--accent); font-size: .84rem; font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .rewards-status { display: flex; align-items: center; gap: .75rem; padding: 0 1.25rem 1rem; }
 .rewards-status p { margin: 0; color: var(--muted-2); font-size: .84rem; }

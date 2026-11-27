@@ -1,14 +1,17 @@
 import { ref } from 'vue'
-import { getUserPointsWallet } from '../api/streamers'
+import { claimDailyLoginReward, getUserPointsWallet } from '../api/streamers'
 import { useAuth } from './useAuth'
 
 const wallet = ref(null)
 const walletLoading = ref(false)
 const walletError = ref('')
+const dailyRewardStatus = ref('')
 const { currentUser } = useAuth()
 let walletUser = null
 let latestRequest = 0
 const pointsFormat = new Intl.NumberFormat('zh-CN')
+const rewardDateFormat = new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', dateStyle: 'short' })
+let rewardCheck
 
 export function formatPoints(value) {
   return Number.isSafeInteger(value) ? pointsFormat.format(value) : '—'
@@ -39,6 +42,41 @@ async function refreshWallet() {
   }
 }
 
+async function checkDailyReward() {
+  const user = currentUser.value
+  if (!user) {
+    rewardCheck = null
+    dailyRewardStatus.value = ''
+    return 0
+  }
+
+  const day = rewardDateFormat.format(new Date())
+  if (rewardCheck?.user === user && rewardCheck.day === day) return 0
+  const check = { user, day }
+  rewardCheck = check
+  dailyRewardStatus.value = ''
+  try {
+    const result = await claimDailyLoginReward()
+    if (rewardCheck !== check || currentUser.value !== user) return 0
+    if (!result?.success || !Number.isSafeInteger(result.daily_points) || result.daily_points < 0) {
+      throw new Error('无效的每日积分响应')
+    }
+    dailyRewardStatus.value = 'claimed'
+    void refreshWallet()
+    return result.daily_points
+  } catch (error) {
+    if (rewardCheck === check && currentUser.value === user) {
+      if (error.status === 401) {
+        dailyRewardStatus.value = 'verify'
+      } else {
+        dailyRewardStatus.value = 'error'
+        rewardCheck = null
+      }
+    }
+    return 0
+  }
+}
+
 export function usePointsWallet() {
-  return { wallet, walletLoading, walletError, refreshWallet }
+  return { wallet, walletLoading, walletError, refreshWallet, dailyRewardStatus, checkDailyReward }
 }

@@ -199,6 +199,19 @@ export async function getClipReportDetail(reportId) {
   }, '获取报告详情失败');
 }
 
+export async function getClipReportComments(reportId, afterId = 0) {
+  const query = afterId ? `?after_id=${encodeURIComponent(afterId)}` : '';
+  return requestJson(`/api/clip-reports/${encodeURIComponent(reportId)}/comments${query}`, {}, '评论加载失败');
+}
+
+export async function createClipReportComment(reportId, payload) {
+  return requestJson(`/api/clip-reports/${encodeURIComponent(reportId)}/comments`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  }, '评论发送失败');
+}
+
 export async function getClipReportUnlockQuote(reportId, payload = {}) {
   if (!reportId) throw new Error('reportId required');
   return requestJson(`/api/clip-reports/${encodeURIComponent(reportId)}/unlock-quote`, {
@@ -219,6 +232,10 @@ export async function unlockClipReport(reportId, payload = {}) {
 
 export async function getUserPointsWallet() {
   return requestJson('/api/user/points/wallet', { cache: 'no-store' }, '获取积分钱包失败');
+}
+
+export async function claimDailyLoginReward() {
+  return requestJson('/api/auth/daily-reward', { method: 'POST' }, '领取每日积分失败');
 }
 
 export async function getPointRewardRules() {

@@ -172,7 +172,7 @@ import { showNotification } from './utils/notification'
 
 const route = useRoute()
 const { currentUser, setUser } = useAuth()
-const { wallet, walletLoading, walletError, refreshWallet } = usePointsWallet()
+const { wallet, walletLoading, walletError, refreshWallet, checkDailyReward } = usePointsWallet()
 const currentYear = new Date().getFullYear()
 const navigationOpen = ref(false)
 const navigationToggle = ref(null)
@@ -255,7 +255,10 @@ function onVerified(result) {
 
   loginDialog.value?.close()
   setUser(result.user)
-  showNotification('登录成功')
+  const awarded = [result.reward_award?.welcome_points, result.reward_award?.daily_points]
+    .filter(points => Number.isSafeInteger(points) && points > 0)
+    .reduce((total, points) => total + points, 0)
+  showNotification(awarded ? `登录成功，已到账 ${formatPoints(awarded)} 积分` : '登录成功')
   window.dispatchEvent(new CustomEvent('login-success', { detail: { user: result.user } }))
   if (subscribeAfterLogin) showSubscribe.value = true
   subscribeAfterLogin = false
@@ -271,20 +274,31 @@ function handleEscape(event) {
   if (event.key === 'Escape' && !loginDialog.value?.open) closeNavigation()
 }
 
+async function syncDailyReward() {
+  if (document.visibilityState !== 'visible') return
+  const points = await checkDailyReward()
+  if (points > 0) showNotification(`每日登录奖励已到账 +${formatPoints(points)} 积分`)
+}
+
 watch(currentUser, () => {
   subscriptions.value = []
   void fetchSubscriptions()
   void refreshWallet()
+  void syncDailyReward()
 }, { immediate: true })
 watch(() => route.fullPath, closeNavigation)
 
 onMounted(() => {
   window.addEventListener('show-notification', handleNotification)
   window.addEventListener('keydown', handleEscape)
+  window.addEventListener('focus', syncDailyReward)
+  document.addEventListener('visibilitychange', syncDailyReward)
 })
 onBeforeUnmount(() => {
   window.removeEventListener('show-notification', handleNotification)
   window.removeEventListener('keydown', handleEscape)
+  window.removeEventListener('focus', syncDailyReward)
+  document.removeEventListener('visibilitychange', syncDailyReward)
   clearTimeout(notificationTimeout)
 })
 </script>

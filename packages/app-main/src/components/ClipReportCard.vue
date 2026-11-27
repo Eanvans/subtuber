@@ -15,7 +15,7 @@
 
     <div class="report-actions">
       <span v-if="report.is_unlocked" class="unlocked"><i class="bi bi-check-circle" aria-hidden="true"></i> 已解锁</span>
-      <span v-else class="report-price"><i class="bi bi-coin" aria-hidden="true"></i> {{ report.unlock_cost === null ? '积分解锁' : `${report.unlock_cost} 积分` }}</span>
+      <span v-else class="report-price"><i class="bi bi-coin" aria-hidden="true"></i> {{ report.unlock_price_points === null ? '积分解锁' : `${report.unlock_price_points} 积分` }}</span>
       <button type="button" class="btn btn-outline btn-sm" :aria-label="`查看报告，${report.title}`" @click="$emit('open', report)">
         查看报告 <span aria-hidden="true">→</span>
       </button>

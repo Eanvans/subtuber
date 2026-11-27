@@ -51,7 +51,7 @@
         </div>
         <span v-if="!reportsLoading && !reportsError" class="moment-count">{{ hotMoments.length }} 份报告</span>
       </div>
-      <div v-if="reportsLoading" class="analysis-state" role="status">正在加载片段报告…</div>
+      <div v-if="reportsLoading && !hotMoments.length" class="analysis-state" role="status">正在加载片段报告…</div>
       <div v-else-if="reportsError" class="analysis-state" role="status">
         <p>{{ reportsError }}</p>
         <button type="button" class="btn btn-outline btn-sm" @click="fetchReports">重新加载</button>
@@ -59,23 +59,7 @@
       <div v-else-if="!hotMoments.length" class="analysis-state">暂无片段报告</div>
       <ol v-else class="moments-list">
         <li v-for="moment in hotMoments" :key="moment.id" class="moment">
-          <div class="moment-timing">
-            <ul v-if="moment.windows.length" class="moment-windows">
-              <li v-for="(window, index) in moment.windows" :key="index" class="moment-time">
-                {{ formatSeconds(window.start_seconds) }} – {{ formatSeconds(window.end_seconds) }}
-              </li>
-            </ul>
-            <span v-else-if="moment.locked" class="moment-locked"><i class="bi bi-lock" aria-hidden="true"></i> 起止时间和得分待解锁</span>
-            <span v-else class="moment-locked">暂无起止时间</span>
-            <span v-if="moment.comments_score != null" class="moment-score">{{ moment.highlight_count > 1 ? '最高互动得分' : '互动得分' }} <strong>{{ moment.comments_score }}</strong></span>
-            <button v-if="moment.locked" type="button" class="btn btn-outline btn-sm" @click="openUnlockDialog(moment)">
-              {{ moment.unlock_price_points > 0 ? `解锁片段 · ${moment.unlock_price_points} 积分` : '积分解锁片段' }}
-            </button>
-          </div>
-          <div class="moment-summary">
-            <p v-if="moment.summary" class="summary-text">{{ moment.summary }}</p>
-            <p v-else>暂无片段摘要</p>
-          </div>
+          <ClipReportDetailCard :report="moment" @unlock="openUnlockDialog(moment)" @request-login="$emit('request-login')" />
         </li>
       </ol>
     </section>
@@ -178,10 +162,12 @@ import { useAuth } from '../composables/useAuth'
 import { usePointsWallet } from '../composables/usePointsWallet'
 import { formatPlatformName } from '../utils/platform'
 import { showNotification } from '../utils/notification'
+import ClipReportDetailCard from '../components/ClipReportDetailCard.vue'
 import Chart from 'chart.js/auto'
 
 export default {
   name: 'RecordingDetail',
+  components: { ClipReportDetailCard },
   emits: ['request-login'],
   setup(_, { emit }) {
     const TIME_SERIES_PAGE_SIZE = 1200
@@ -256,6 +242,7 @@ export default {
             windows,
             comments_score: unlocked ? report.comments_score : null,
             unlock_price_points: report.unlock_price_points,
+            previewSummary: report.spoiler_free_summary,
             summary: unlocked ? report.summary || report.spoiler_free_summary : report.spoiler_free_summary
           }
         })
@@ -569,7 +556,13 @@ export default {
 
     watch([timeSeriesData, hotMoments, chartCanvas], renderTimeSeriesChart, { flush: 'post' })
     watch(currentUser, () => {
-      hotMoments.value = []
+      hotMoments.value = hotMoments.value.map(moment => ({
+        ...moment,
+        locked: moment.highlight_count > 0,
+        windows: [],
+        comments_score: null,
+        summary: moment.previewSummary
+      }))
       unlockDialog.value?.close()
       activeReport.value = null
       void fetchReports()
@@ -620,7 +613,6 @@ export default {
       handleUnlockCancel,
       loadUnlockQuote,
       confirmUnlock,
-      formatSeconds,
       refreshAnalysis,
       applyAdvancedParams
     }
@@ -663,24 +655,7 @@ export default {
   padding: 0 1.25rem .4rem;
   list-style: none;
 }
-.moment {
-  display: grid;
-  gap: .75rem;
-  break-inside: avoid;
-  margin-bottom: .9rem;
-  padding: .95rem 1rem;
-  border: 1px solid var(--border);
-  border-radius: 9px;
-}
-.moment-time { color: var(--text); font-size: .88rem; font-variant-numeric: tabular-nums; font-weight: 700; }
-.moment-windows { display: grid; gap: .35rem; margin: 0; padding: 0; list-style: none; }
-.moment-timing { display: grid; align-self: start; justify-items: start; gap: .35rem; }
-.moment-score { color: var(--muted-2); font-size: .8rem; font-variant-numeric: tabular-nums; }
-.moment-locked { color: var(--muted-2); font-size: .8rem; }
-.moment-timing .btn { text-align: left; }
-.moment-summary { min-width: 0; }
-.moment-summary p { margin: 0; color: var(--muted); font-size: .85rem; line-height: 1.65; overflow-wrap: anywhere; }
-.summary-text { white-space: pre-wrap; }
+.moment { break-inside: avoid; margin-bottom: .9rem; }
 
 @media (max-width: 560px) {
   .time-series-chart, .hot-moments .analysis-header, .moments-list { padding-inline: .85rem; }
